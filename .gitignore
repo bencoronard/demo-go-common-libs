@@ -1,0 +1,7 @@
+build/
+
+### VS Code ###
+.vscode/
+
+### Sensitive files ###
+.env
