@@ -1,13 +1,55 @@
 package reader
 
-import "crypto/rsa"
+import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"errors"
+	"strings"
+)
 
 func ReadRsaPrivateKeyPkcs8(content string) (*rsa.PrivateKey, error) {
-	var key rsa.PrivateKey
-	return &key, nil
+	clean := strings.ReplaceAll(content, "-----BEGIN PRIVATE KEY-----", "")
+	clean = strings.ReplaceAll(clean, "-----END PRIVATE KEY-----", "")
+	clean = strings.TrimSpace(clean)
+
+	der, err := base64.StdEncoding.DecodeString(clean)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(der)
+	if err != nil {
+		return nil, err
+	}
+
+	rsaKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("not an RSA private key")
+	}
+
+	return rsaKey, nil
 }
 
 func ReadRsaPublicKeyX509(content string) (*rsa.PublicKey, error) {
-	var key rsa.PublicKey
-	return &key, nil
+	clean := strings.ReplaceAll(content, "-----BEGIN PUBLIC KEY-----", "")
+	clean = strings.ReplaceAll(clean, "-----END PUBLIC KEY-----", "")
+	clean = strings.TrimSpace(clean)
+
+	der, err := base64.StdEncoding.DecodeString(clean)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := x509.ParsePKIXPublicKey(der)
+	if err != nil {
+		return nil, err
+	}
+
+	rsaKey, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("not an RSA public key")
+	}
+
+	return rsaKey, nil
 }
