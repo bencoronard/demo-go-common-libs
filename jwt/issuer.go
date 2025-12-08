@@ -1,42 +1,89 @@
 package jwt
 
 import (
+	"crypto/rsa"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type JwtIssuer interface {
-	IssueToken(iss string, sub string, ttl time.Duration) (string, error)
+	IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error)
 }
 
-type jwtIssuerImpl struct {
+type unsignedJwtIssuer struct {
+	iss string
+}
+
+type symmJwtIssuer struct {
+	iss string
 	key []byte
 }
 
-func NewJwtIssuer(secret string) JwtIssuer {
-	return &jwtIssuerImpl{
-		key: []byte(secret),
-	}
+type asymmJwtIssuer struct {
+	iss string
+	key *rsa.PrivateKey
 }
 
-func (j *jwtIssuerImpl) IssueToken(iss string, sub string, ttl time.Duration) (string, error) {
+func NewUnsignedJwtIssuer(iss string) JwtIssuer {
+	return &unsignedJwtIssuer{iss: iss}
+}
+
+func NewSymmJwtIssuer(iss string, key []byte) JwtIssuer {
+	return &symmJwtIssuer{iss: iss, key: key}
+}
+
+func NewAsymmJwtIssuer(iss string, key *rsa.PrivateKey) JwtIssuer {
+	return &asymmJwtIssuer{iss: iss, key: key}
+}
+
+func (i *unsignedJwtIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	now := time.Now()
+	eff := now
 
-	claims := jwt.RegisteredClaims{
-		Issuer:    iss,
-		Subject:   sub,
-		IssuedAt:  jwt.NewNumericDate(now),
-		NotBefore: jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+	tkn := jwt.RegisteredClaims{}
+
+	if nbf != nil {
+		eff = *nbf
+		tkn.NotBefore = jwt.NewNumericDate(eff)
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenStr, err := token.SignedString(j.key)
+	if ttl != nil {
+		exp := now.Add(*ttl)
+		if exp.Before(now) {
+			return "", errors.New("token expiration cannot be in the past")
+		}
+		tkn.ExpiresAt = jwt.NewNumericDate(exp)
+	}
+
+	rand, err := uuid.NewRandom()
 	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
+		return "", err
 	}
 
-	return tokenStr, nil
+	tkn.ID = rand.String()
+	tkn.Issuer = i.iss
+	tkn.Subject = sub
+	tkn.IssuedAt = jwt.NewNumericDate(now)
+	tkn.Audience = aud
+
+	token := jwt.NewWithClaims(jwt.SigningMethodNone, tkn)
+
+	jwt, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	if err != nil {
+		return "", fmt.Errorf("failed to issue unsigned token: %w", err)
+	}
+
+	return jwt, nil
+}
+
+func (i *symmJwtIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
+	panic("unimplemented")
+}
+
+func (i *asymmJwtIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
+	panic("unimplemented")
 }
