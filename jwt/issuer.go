@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -44,11 +45,11 @@ func (i *unsignedJwtIssuer) IssueToken(sub string, aud []string, claims map[stri
 	now := time.Now()
 	eff := now
 
-	tkn := jwt.RegisteredClaims{}
+	mc := jwt.MapClaims{}
 
 	if nbf != nil {
 		eff = *nbf
-		tkn.NotBefore = jwt.NewNumericDate(eff)
+		mc["nbf"] = jwt.NewNumericDate(eff)
 	}
 
 	if ttl != nil {
@@ -56,7 +57,7 @@ func (i *unsignedJwtIssuer) IssueToken(sub string, aud []string, claims map[stri
 		if exp.Before(now) {
 			return "", errors.New("token expiration cannot be in the past")
 		}
-		tkn.ExpiresAt = jwt.NewNumericDate(exp)
+		mc["exp"] = jwt.NewNumericDate(exp)
 	}
 
 	rand, err := uuid.NewRandom()
@@ -64,26 +65,101 @@ func (i *unsignedJwtIssuer) IssueToken(sub string, aud []string, claims map[stri
 		return "", err
 	}
 
-	tkn.ID = rand.String()
-	tkn.Issuer = i.iss
-	tkn.Subject = sub
-	tkn.IssuedAt = jwt.NewNumericDate(now)
-	tkn.Audience = aud
+	mc["iss"] = i.iss
+	mc["jti"] = rand.String()
+	mc["sub"] = sub
+	mc["iat"] = jwt.NewNumericDate(now)
+	mc["aud"] = aud
+	maps.Copy(mc, claims)
 
-	token := jwt.NewWithClaims(jwt.SigningMethodNone, tkn)
+	token := jwt.NewWithClaims(jwt.SigningMethodNone, mc)
 
-	jwt, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	tokenStr, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
 	if err != nil {
 		return "", fmt.Errorf("failed to issue unsigned token: %w", err)
 	}
 
-	return jwt, nil
+	return tokenStr, nil
 }
 
 func (i *symmJwtIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
-	panic("unimplemented")
+	now := time.Now()
+	eff := now
+
+	mc := jwt.MapClaims{}
+
+	if nbf != nil {
+		eff = *nbf
+		mc["nbf"] = jwt.NewNumericDate(eff)
+	}
+
+	if ttl != nil {
+		exp := now.Add(*ttl)
+		if exp.Before(now) {
+			return "", errors.New("token expiration cannot be in the past")
+		}
+		mc["exp"] = jwt.NewNumericDate(exp)
+	}
+
+	rand, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
+	}
+
+	mc["iss"] = i.iss
+	mc["jti"] = rand.String()
+	mc["sub"] = sub
+	mc["iat"] = jwt.NewNumericDate(now)
+	mc["aud"] = aud
+	maps.Copy(mc, claims)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, mc)
+
+	tokenStr, err := token.SignedString(i.key)
+	if err != nil {
+		return "", fmt.Errorf("failed to issue symmetrically signed token: %w", err)
+	}
+
+	return tokenStr, nil
 }
 
 func (i *asymmJwtIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
-	panic("unimplemented")
+	now := time.Now()
+	eff := now
+
+	mc := jwt.MapClaims{}
+
+	if nbf != nil {
+		eff = *nbf
+		mc["nbf"] = jwt.NewNumericDate(eff)
+	}
+
+	if ttl != nil {
+		exp := now.Add(*ttl)
+		if exp.Before(now) {
+			return "", errors.New("token expiration cannot be in the past")
+		}
+		mc["exp"] = jwt.NewNumericDate(exp)
+	}
+
+	rand, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
+	}
+
+	mc["iss"] = i.iss
+	mc["jti"] = rand.String()
+	mc["sub"] = sub
+	mc["iat"] = jwt.NewNumericDate(now)
+	mc["aud"] = aud
+	maps.Copy(mc, claims)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, mc)
+
+	tokenStr, err := token.SignedString(i.key)
+	if err != nil {
+		return "", fmt.Errorf("failed to issue symmetrically signed token: %w", err)
+	}
+
+	return tokenStr, nil
 }
