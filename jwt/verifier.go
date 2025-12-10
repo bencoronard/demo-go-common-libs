@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"crypto/rsa"
+	"errors"
 	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -22,16 +23,22 @@ type asymmJwtVerifier struct {
 	key *rsa.PublicKey
 }
 
-func NewUnsignedJwtVerifier() JwtVerifier {
-	return &unsignedJwtVerifier{}
+func NewUnsignedJwtVerifier() (JwtVerifier, error) {
+	return &unsignedJwtVerifier{}, nil
 }
 
-func NewSymmJwtVerifier(key []byte) JwtVerifier {
-	return &symmJwtVerifier{key: key}
+func NewSymmJwtVerifier(key []byte) (JwtVerifier, error) {
+	if key == nil {
+		return nil, errors.New("symmetric key must not be nil")
+	}
+	return &symmJwtVerifier{key: key}, nil
 }
 
-func NewAsymmJwtVerifier(key *rsa.PublicKey) JwtVerifier {
-	return &asymmJwtVerifier{key: key}
+func NewAsymmJwtVerifier(key *rsa.PublicKey) (JwtVerifier, error) {
+	if key == nil {
+		return nil, errors.New("public key must not be nil")
+	}
+	return &asymmJwtVerifier{key: key}, nil
 }
 
 func (v *unsignedJwtVerifier) VerifyToken(tokenStr string) (jwt.MapClaims, error) {

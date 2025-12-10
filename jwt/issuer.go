@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"crypto/rsa"
+	"errors"
 	"maps"
 	"time"
 
@@ -27,16 +28,22 @@ type asymmJwtIssuer struct {
 	key *rsa.PrivateKey
 }
 
-func NewUnsignedJwtIssuer(iss string) JwtIssuer {
-	return &unsignedJwtIssuer{iss: iss}
+func NewUnsignedJwtIssuer(iss string) (JwtIssuer, error) {
+	return &unsignedJwtIssuer{iss: iss}, nil
 }
 
-func NewSymmJwtIssuer(iss string, key []byte) JwtIssuer {
-	return &symmJwtIssuer{iss: iss, key: key}
+func NewSymmJwtIssuer(iss string, key []byte) (JwtIssuer, error) {
+	if key == nil {
+		return nil, errors.New("symmetric key must not be nil")
+	}
+	return &symmJwtIssuer{iss: iss, key: key}, nil
 }
 
-func NewAsymmJwtIssuer(iss string, key *rsa.PrivateKey) JwtIssuer {
-	return &asymmJwtIssuer{iss: iss, key: key}
+func NewAsymmJwtIssuer(iss string, key *rsa.PrivateKey) (JwtIssuer, error) {
+	if key == nil {
+		return nil, errors.New("private key must not be nil")
+	}
+	return &asymmJwtIssuer{iss: iss, key: key}, nil
 }
 
 func (i *unsignedJwtIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
