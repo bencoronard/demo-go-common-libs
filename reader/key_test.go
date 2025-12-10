@@ -24,9 +24,7 @@ func TestMain(m *testing.M) {
 		panic("failed to read public key fixture for setup: " + err.Error())
 	}
 
-	exitCode := m.Run()
-
-	os.Exit(exitCode)
+	os.Exit(m.Run())
 }
 
 func TestReadRsaPrivateKeyPkcs8_shouldReturnPrivateKey(t *testing.T) {
