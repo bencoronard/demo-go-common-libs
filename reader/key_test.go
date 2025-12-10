@@ -5,13 +5,32 @@ import (
 	"testing"
 )
 
-func TestReadRsaPrivateKeyPkcs8_shouldReturnPrivateKey(t *testing.T) {
-	pem, err := os.ReadFile("testdata/rsa-private-pkcs8.pem")
+var (
+	rsaPrivatePkcs8PEM []byte
+	rsaPublicX509PEM   []byte
+)
+
+func TestMain(m *testing.M) {
+	var err error
+
+	rsaPrivatePkcs8PEM, err = os.ReadFile("testdata/rsa-private-pkcs8.pem")
 	if err != nil {
-		t.Fatalf("failed to read private key fixture: %v", err)
+		panic("failed to read private key fixture for setup: " + err.Error())
 	}
 
-	key, err := ReadRsaPrivateKeyPkcs8(string(pem))
+	rsaPublicX509PEM, err = os.ReadFile("testdata/rsa-public-x509.pem")
+	if err != nil {
+
+		panic("failed to read public key fixture for setup: " + err.Error())
+	}
+
+	exitCode := m.Run()
+
+	os.Exit(exitCode)
+}
+
+func TestReadRsaPrivateKeyPkcs8_shouldReturnPrivateKey(t *testing.T) {
+	key, err := ReadRsaPrivateKeyPkcs8(string(rsaPrivatePkcs8PEM))
 	if err != nil {
 		t.Fatalf("expected private key to parse successfully, got error: %v", err)
 	}
@@ -22,12 +41,7 @@ func TestReadRsaPrivateKeyPkcs8_shouldReturnPrivateKey(t *testing.T) {
 }
 
 func TestReadRsaPublicKeyX509_shouldReturnPublicKey(t *testing.T) {
-	pem, err := os.ReadFile("testdata/rsa-public-x509.pem")
-	if err != nil {
-		t.Fatalf("failed to read public key fixture: %v", err)
-	}
-
-	key, err := ReadRsaPublicKeyX509(string(pem))
+	key, err := ReadRsaPublicKeyX509(string(rsaPublicX509PEM))
 	if err != nil {
 		t.Fatalf("expected public key to parse successfully, got error: %v", err)
 	}
@@ -38,23 +52,12 @@ func TestReadRsaPublicKeyX509_shouldReturnPublicKey(t *testing.T) {
 }
 
 func TestDerivePublicKeyFromPrivateKey_shouldMatchReadPublicKey(t *testing.T) {
-
-	privPem, err := os.ReadFile("testdata/rsa-private-pkcs8.pem")
-	if err != nil {
-		t.Fatalf("failed to read private key fixture: %v", err)
-	}
-
-	privKey, err := ReadRsaPrivateKeyPkcs8(string(privPem))
+	privKey, err := ReadRsaPrivateKeyPkcs8(string(rsaPrivatePkcs8PEM))
 	if err != nil {
 		t.Fatalf("expected private key to parse successfully, got error: %v", err)
 	}
 
-	pubPem, err := os.ReadFile("testdata/rsa-public-x509.pem")
-	if err != nil {
-		t.Fatalf("failed to read public key fixture: %v", err)
-	}
-
-	pubKey, err := ReadRsaPublicKeyX509(string(pubPem))
+	pubKey, err := ReadRsaPublicKeyX509(string(rsaPublicX509PEM))
 	if err != nil {
 		t.Fatalf("expected public key to parse successfully, got error: %v", err)
 	}
