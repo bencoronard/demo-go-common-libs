@@ -11,7 +11,7 @@ import (
 )
 
 type JwtIssuer interface {
-	IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (*string, error)
+	IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error)
 }
 
 type unsignedJwtIssuer struct {
@@ -46,26 +46,26 @@ func NewAsymmJwtIssuer(iss string, key *rsa.PrivateKey) (JwtIssuer, error) {
 	return &asymmJwtIssuer{iss: iss, key: key}, nil
 }
 
-func (i *unsignedJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (*string, error) {
+func (i *unsignedJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return issueToken(jwt.SigningMethodNone, mc, jwt.UnsafeAllowNoneSignatureType)
 }
 
-func (i *symmJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (*string, error) {
+func (i *symmJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return issueToken(jwt.SigningMethodHS256, mc, i.key)
 }
 
-func (i *asymmJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (*string, error) {
+func (i *asymmJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return issueToken(jwt.SigningMethodRS256, mc, i.key)
 }
@@ -104,11 +104,11 @@ func buildClaims(iss string, sub *string, aud []string, claims map[string]any, t
 	return mc, nil
 }
 
-func issueToken(method jwt.SigningMethod, claims jwt.MapClaims, key any) (*string, error) {
+func issueToken(method jwt.SigningMethod, claims jwt.MapClaims, key any) (string, error) {
 	token := jwt.NewWithClaims(method, claims)
 	tokenStr, err := token.SignedString(key)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return &tokenStr, nil
+	return tokenStr, nil
 }
