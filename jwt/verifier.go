@@ -71,13 +71,9 @@ func (v *asymmJwtVerifier) VerifyToken(tokenStr string) (jwt.MapClaims, error) {
 func verifyToken(tokenStr string, keyFunc jwt.Keyfunc) (jwt.MapClaims, error) {
 	claims := jwt.MapClaims{}
 
-	token, err := jwt.ParseWithClaims(tokenStr, claims, keyFunc)
+	_, err := jwt.ParseWithClaims(tokenStr, claims, keyFunc)
 	if err != nil {
 		return nil, err
-	}
-
-	if !token.Valid {
-		return nil, ErrTokenClaimsInvalid
 	}
 
 	return claims, nil
