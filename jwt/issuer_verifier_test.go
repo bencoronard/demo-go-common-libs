@@ -5,8 +5,11 @@ import (
 	"crypto/rsa"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -55,4 +58,202 @@ func TestNewSymmJwtIssuer_withNilSymmetricKey_shouldReturnError(t *testing.T) {
 func TestNewAsymmJwtIssuer_withNilPrivateKey_shouldReturnError(t *testing.T) {
 	_, err := NewAsymmJwtIssuer(issuerName, nil)
 	assert.EqualError(t, err, "private key must not be nil")
+}
+
+func TestIssueToken_withoutKey_withInvalidTtl_shouldReturnError(t *testing.T) {
+	issuer, err := NewUnsignedJwtIssuer(issuerName)
+	require.NoError(t, err)
+	require.NotNil(t, issuer)
+
+	ttl := -1 * time.Second
+	_, err = issuer.IssueToken(nil, nil, nil, &ttl, nil)
+
+	assert.ErrorIs(t, err, ErrExpiredTokenIssueAttempted)
+}
+
+func TestIssueToken_withSymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
+	issuer, err := NewSymmJwtIssuer(issuerName, symmetricKey)
+	require.NoError(t, err)
+	require.NotNil(t, issuer)
+
+	ttl := -1 * time.Second
+	_, err = issuer.IssueToken(nil, nil, nil, &ttl, nil)
+
+	assert.ErrorIs(t, err, ErrExpiredTokenIssueAttempted)
+}
+
+func TestIssueToken_withAsymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
+	issuer, err := NewAsymmJwtIssuer(issuerName, privateKey)
+	require.NoError(t, err)
+	require.NotNil(t, issuer)
+
+	ttl := -1 * time.Second
+	_, err = issuer.IssueToken(nil, nil, nil, &ttl, nil)
+
+	assert.ErrorIs(t, err, ErrExpiredTokenIssueAttempted)
+}
+
+func TestIssueToken_withoutKey_shouldBeParsableWithUnsecuredVerifier(t *testing.T) {
+	issuer, err := NewUnsignedJwtIssuer(issuerName)
+	require.NoError(t, err)
+	require.NotNil(t, issuer)
+
+	verifier, err := NewUnsignedJwtVerifier()
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+
+	token, err := issuer.IssueToken(nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, token)
+
+	claims, err := verifier.VerifyToken(token)
+	require.NoError(t, err)
+	require.NotNil(t, claims)
+
+	assert.NotNil(t, claims["jti"])
+	assert.NotNil(t, claims["iat"])
+}
+
+func TestIssueToken_withSymmKey_shouldBeParsableWithSymmVerifier(t *testing.T) {
+	issuer, err := NewSymmJwtIssuer(issuerName, symmetricKey)
+	require.NoError(t, err)
+	require.NotNil(t, issuer)
+
+	verifier, err := NewSymmJwtVerifier(symmetricKey)
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+
+	token, err := issuer.IssueToken(nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, token)
+
+	claims, err := verifier.VerifyToken(token)
+	require.NoError(t, err)
+	require.NotNil(t, claims)
+
+	assert.NotNil(t, claims["jti"])
+	assert.NotNil(t, claims["iat"])
+}
+
+func TestIssueToken_withAsymmKey_shouldBeParsableWithAsymmVerifier(t *testing.T) {
+	issuer, err := NewAsymmJwtIssuer(issuerName, privateKey)
+	require.NoError(t, err)
+	require.NotNil(t, issuer)
+
+	verifier, err := NewAsymmJwtVerifier(publicKey)
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+
+	token, err := issuer.IssueToken(nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, token)
+
+	claims, err := verifier.VerifyToken(token)
+	require.NoError(t, err)
+	require.NotNil(t, claims)
+
+	assert.NotNil(t, claims["jti"])
+	assert.NotNil(t, claims["iat"])
+}
+
+func TestVerifyToken_withoutKey_whenTokenExpired_shouldReturnError(t *testing.T) {
+	verifier, err := NewUnsignedJwtVerifier()
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Second)),
+	})
+	require.NotNil(t, token)
+
+	tokenStr, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	require.NoError(t, err)
+
+	_, err = verifier.VerifyToken(tokenStr)
+	assert.Error(t, err)
+}
+
+func TestVerifyToken_withSymmKey_whenTokenExpired_shouldReturnError(t *testing.T) {
+	verifier, err := NewSymmJwtVerifier(symmetricKey)
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Second)),
+	})
+	require.NotNil(t, token)
+
+	tokenStr, err := token.SignedString(symmetricKey)
+	require.NoError(t, err)
+
+	_, err = verifier.VerifyToken(tokenStr)
+	assert.Error(t, err)
+}
+
+func TestVerifyToken_withAsymmKey_whenTokenExpired_shouldReturnError(t *testing.T) {
+	verifier, err := NewAsymmJwtVerifier(publicKey)
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Second)),
+	})
+	require.NotNil(t, token)
+
+	tokenStr, err := token.SignedString(privateKey)
+	require.NoError(t, err)
+
+	_, err = verifier.VerifyToken(tokenStr)
+	assert.Error(t, err)
+}
+
+func TestVerifyToken_withoutKey_whenTokenNotYetUsable_shouldReturnError(t *testing.T) {
+	verifier, err := NewUnsignedJwtVerifier()
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.RegisteredClaims{
+		NotBefore: jwt.NewNumericDate(time.Now().Add(5 * time.Second)),
+	})
+	require.NotNil(t, token)
+
+	tokenStr, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	require.NoError(t, err)
+
+	_, err = verifier.VerifyToken(tokenStr)
+	assert.Error(t, err)
+}
+
+func TestVerifyToken_withSymmKey_whenTokenNotYetUsable_shouldReturnError(t *testing.T) {
+	verifier, err := NewSymmJwtVerifier(symmetricKey)
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		NotBefore: jwt.NewNumericDate(time.Now().Add(5 * time.Second)),
+	})
+	require.NotNil(t, token)
+
+	tokenStr, err := token.SignedString(symmetricKey)
+	require.NoError(t, err)
+
+	_, err = verifier.VerifyToken(tokenStr)
+	assert.Error(t, err)
+}
+
+func TestVerifyToken_withAsymmKey_whenTokenNotYetUsable_shouldReturnError(t *testing.T) {
+	verifier, err := NewAsymmJwtVerifier(publicKey)
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.RegisteredClaims{
+		NotBefore: jwt.NewNumericDate(time.Now().Add(5 * time.Second)),
+	})
+	require.NotNil(t, token)
+
+	tokenStr, err := token.SignedString(privateKey)
+	require.NoError(t, err)
+
+	_, err = verifier.VerifyToken(tokenStr)
+	assert.Error(t, err)
 }

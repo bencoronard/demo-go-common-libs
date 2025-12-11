@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -30,40 +31,30 @@ func TestMain(m *testing.M) {
 
 func TestReadRsaPrivateKeyPkcs8_shouldReturnPrivateKey(t *testing.T) {
 	key, err := ReadRsaPrivateKeyPkcs8(string(rsaPrivatePkcs8PEM))
+	require.NoError(t, err)
+	require.NotNil(t, key)
 
-	assert.NoError(t, err, "expected private key to parse successfully")
-
-	if key != nil {
-		assert.NoError(t, key.Validate(), "expected valid private key after parsing")
-	}
+	assert.NoError(t, key.Validate())
 }
 
 func TestReadRsaPublicKeyX509_shouldReturnPublicKey(t *testing.T) {
 	key, err := ReadRsaPublicKeyX509(string(rsaPublicX509PEM))
+	require.NoError(t, err)
+	require.NotNil(t, key)
 
-	assert.NoError(t, err, "expected public key to parse successfully")
-
-	if key != nil {
-		assert.NotNil(t, key.N, "public key modulus N should not be nil")
-		assert.True(t, key.N.Sign() > 0, "public key modulus N should be positive")
-		assert.True(t, key.E > 1, "public key exponent E should be greater than 1")
-	}
+	assert.True(t, key.N.Sign() > 0)
+	assert.True(t, key.E > 1)
 }
 
 func TestDerivePublicKeyFromPrivateKey_shouldMatchReadPublicKey(t *testing.T) {
 	privKey, err := ReadRsaPrivateKeyPkcs8(string(rsaPrivatePkcs8PEM))
-
-	if !assert.NoError(t, err, "expected private key to parse successfully") {
-		return
-	}
+	require.NoError(t, err)
+	require.NotNil(t, privKey)
 
 	pubKey, err := ReadRsaPublicKeyX509(string(rsaPublicX509PEM))
-	if !assert.NoError(t, err, "expected public key to parse successfully") {
-		return
-	}
+	require.NoError(t, err)
+	require.NotNil(t, pubKey)
 
-	if privKey != nil && pubKey != nil {
-		assert.Equal(t, 0, privKey.PublicKey.N.Cmp(pubKey.N), "derived public key modulus (N) must match read public key modulus")
-		assert.Equal(t, pubKey.E, privKey.PublicKey.E, "derived public key exponent (E) must match read public key exponent")
-	}
+	assert.Equal(t, 0, privKey.PublicKey.N.Cmp(pubKey.N))
+	assert.Equal(t, pubKey.E, privKey.PublicKey.E)
 }
