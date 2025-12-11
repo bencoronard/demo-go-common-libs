@@ -3,6 +3,8 @@ package reader
 import (
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -20,7 +22,6 @@ func TestMain(m *testing.M) {
 
 	rsaPublicX509PEM, err = os.ReadFile("testdata/rsa-public-x509.pem")
 	if err != nil {
-
 		panic("failed to read public key fixture for setup: " + err.Error())
 	}
 
@@ -29,38 +30,40 @@ func TestMain(m *testing.M) {
 
 func TestReadRsaPrivateKeyPkcs8_shouldReturnPrivateKey(t *testing.T) {
 	key, err := ReadRsaPrivateKeyPkcs8(string(rsaPrivatePkcs8PEM))
-	if err != nil {
-		t.Fatalf("expected private key to parse successfully, got error: %v", err)
-	}
 
-	if err := key.Validate(); err != nil {
-		t.Fatalf("expected valid private key, got error: %v", err)
+	assert.NoError(t, err, "expected private key to parse successfully")
+
+	if key != nil {
+		assert.NoError(t, key.Validate(), "expected valid private key after parsing")
 	}
 }
 
 func TestReadRsaPublicKeyX509_shouldReturnPublicKey(t *testing.T) {
 	key, err := ReadRsaPublicKeyX509(string(rsaPublicX509PEM))
-	if err != nil {
-		t.Fatalf("expected public key to parse successfully, got error: %v", err)
-	}
 
-	if key.N == nil || key.N.Sign() <= 0 || key.E <= 1 {
-		t.Fatal("expected valid public key")
+	assert.NoError(t, err, "expected public key to parse successfully")
+
+	if key != nil {
+		assert.NotNil(t, key.N, "public key modulus N should not be nil")
+		assert.True(t, key.N.Sign() > 0, "public key modulus N should be positive")
+		assert.True(t, key.E > 1, "public key exponent E should be greater than 1")
 	}
 }
 
 func TestDerivePublicKeyFromPrivateKey_shouldMatchReadPublicKey(t *testing.T) {
 	privKey, err := ReadRsaPrivateKeyPkcs8(string(rsaPrivatePkcs8PEM))
-	if err != nil {
-		t.Fatalf("expected private key to parse successfully, got error: %v", err)
+
+	if !assert.NoError(t, err, "expected private key to parse successfully") {
+		return
 	}
 
 	pubKey, err := ReadRsaPublicKeyX509(string(rsaPublicX509PEM))
-	if err != nil {
-		t.Fatalf("expected public key to parse successfully, got error: %v", err)
+	if !assert.NoError(t, err, "expected public key to parse successfully") {
+		return
 	}
 
-	if privKey.PublicKey.N.Cmp(pubKey.N) != 0 || privKey.PublicKey.E != pubKey.E {
-		t.Fatal("derived public key does not match read public key")
+	if privKey != nil && pubKey != nil {
+		assert.Equal(t, 0, privKey.PublicKey.N.Cmp(pubKey.N), "derived public key modulus (N) must match read public key modulus")
+		assert.Equal(t, pubKey.E, privKey.PublicKey.E, "derived public key exponent (E) must match read public key exponent")
 	}
 }
