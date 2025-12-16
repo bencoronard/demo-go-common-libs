@@ -1,24 +1,41 @@
 package http
 
 import (
+	"net/http"
+	"regexp"
+	"strings"
+
 	xjwt "github.com/bencoronard/demo-go-common-libs/jwt"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type AuthTokenResolver interface {
-	ResolveToken(tokenStr string) (jwt.MapClaims, error)
+type HttpAuthHeaderResolver interface {
+	ExtractClaims(r *http.Request) (jwt.MapClaims, error)
 }
 
-type authTokenResolverImpl struct {
+type httpAuthHeaderResolverImpl struct {
 	verifier xjwt.JwtVerifier
 }
 
-func NewAuthTokenResolver(verifier xjwt.JwtVerifier) (AuthTokenResolver, error) {
-	return &authTokenResolverImpl{
-		verifier: verifier,
-	}, nil
+func NewHttpAuthHeaderResolver(verifier xjwt.JwtVerifier) HttpAuthHeaderResolver {
+	return &httpAuthHeaderResolverImpl{verifier: verifier}
 }
 
-func (r *authTokenResolverImpl) ResolveToken(tokenStr string) (jwt.MapClaims, error) {
-	return r.verifier.VerifyToken(tokenStr)
+func (h *httpAuthHeaderResolverImpl) ExtractClaims(r *http.Request) (jwt.MapClaims, error) {
+	header := strings.TrimSpace(r.Header.Get("Authorization"))
+	if header == "" {
+		return nil, ErrMissingRequestHeader
+	}
+
+	claims, err := h.verifier.VerifyToken(header[len("Bearer "):])
+	if err != nil {
+		return nil, err
+	}
+
+	sub, _ := claims["sub"].(string)
+	if sub == "" || !regexp.MustCompile(`^\d+$`).MatchString(sub) {
+		return nil, xjwt.ErrTokenMalformed
+	}
+
+	return claims, nil
 }
