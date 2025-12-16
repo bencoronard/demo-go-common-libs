@@ -10,43 +10,43 @@ import (
 	"github.com/google/uuid"
 )
 
-type JwtIssuer interface {
+type Issuer interface {
 	IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error)
 }
 
-type unsignedJwtIssuer struct {
+type unsignedIssuer struct {
 	iss string
 }
 
-type symmJwtIssuer struct {
+type symmIssuer struct {
 	iss string
 	key []byte
 }
 
-type asymmJwtIssuer struct {
+type asymmIssuer struct {
 	iss string
 	key *rsa.PrivateKey
 }
 
-func NewUnsignedJwtIssuer(iss string) (JwtIssuer, error) {
-	return &unsignedJwtIssuer{iss: iss}, nil
+func NewUnsignedIssuer(iss string) (Issuer, error) {
+	return &unsignedIssuer{iss: iss}, nil
 }
 
-func NewSymmJwtIssuer(iss string, key []byte) (JwtIssuer, error) {
+func NewSymmIssuer(iss string, key []byte) (Issuer, error) {
 	if key == nil {
 		return nil, errors.New("symmetric key must not be nil")
 	}
-	return &symmJwtIssuer{iss: iss, key: key}, nil
+	return &symmIssuer{iss: iss, key: key}, nil
 }
 
-func NewAsymmJwtIssuer(iss string, key *rsa.PrivateKey) (JwtIssuer, error) {
+func NewAsymmIssuer(iss string, key *rsa.PrivateKey) (Issuer, error) {
 	if key == nil {
 		return nil, errors.New("private key must not be nil")
 	}
-	return &asymmJwtIssuer{iss: iss, key: key}, nil
+	return &asymmIssuer{iss: iss, key: key}, nil
 }
 
-func (i *unsignedJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
+func (i *unsignedIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
 	if err != nil {
 		return "", err
@@ -54,7 +54,7 @@ func (i *unsignedJwtIssuer) IssueToken(sub *string, aud []string, claims map[str
 	return issueToken(jwt.SigningMethodNone, mc, jwt.UnsafeAllowNoneSignatureType)
 }
 
-func (i *symmJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
+func (i *symmIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
 	if err != nil {
 		return "", err
@@ -62,7 +62,7 @@ func (i *symmJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]
 	return issueToken(jwt.SigningMethodHS256, mc, i.key)
 }
 
-func (i *asymmJwtIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
+func (i *asymmIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
 	if err != nil {
 		return "", err

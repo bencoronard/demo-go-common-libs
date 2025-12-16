@@ -40,28 +40,28 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestNewSymmJwtVerifier_withNilSymmetricKey_shouldReturnError(t *testing.T) {
-	_, err := NewSymmJwtVerifier(nil)
+func TestNewSymmVerifier_withNilSymmetricKey_shouldReturnError(t *testing.T) {
+	_, err := NewSymmVerifier(nil)
 	assert.EqualError(t, err, "symmetric key must not be nil")
 }
 
-func TestNewAsymmJwtVerifier_withNilPublicKey_shouldReturnError(t *testing.T) {
-	_, err := NewAsymmJwtVerifier(nil)
+func TestNewAsymmVerifier_withNilPublicKey_shouldReturnError(t *testing.T) {
+	_, err := NewAsymmVerifier(nil)
 	assert.EqualError(t, err, "public key must not be nil")
 }
 
-func TestNewSymmJwtIssuer_withNilSymmetricKey_shouldReturnError(t *testing.T) {
-	_, err := NewSymmJwtIssuer(issuerName, nil)
+func TestNewSymmIssuer_withNilSymmetricKey_shouldReturnError(t *testing.T) {
+	_, err := NewSymmIssuer(issuerName, nil)
 	assert.EqualError(t, err, "symmetric key must not be nil")
 }
 
-func TestNewAsymmJwtIssuer_withNilPrivateKey_shouldReturnError(t *testing.T) {
-	_, err := NewAsymmJwtIssuer(issuerName, nil)
+func TestNewAsymmIssuer_withNilPrivateKey_shouldReturnError(t *testing.T) {
+	_, err := NewAsymmIssuer(issuerName, nil)
 	assert.EqualError(t, err, "private key must not be nil")
 }
 
 func TestIssueToken_withoutKey_withInvalidTtl_shouldReturnError(t *testing.T) {
-	issuer, err := NewUnsignedJwtIssuer(issuerName)
+	issuer, err := NewUnsignedIssuer(issuerName)
 	require.NoError(t, err)
 	require.NotNil(t, issuer)
 
@@ -72,7 +72,7 @@ func TestIssueToken_withoutKey_withInvalidTtl_shouldReturnError(t *testing.T) {
 }
 
 func TestIssueToken_withSymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
-	issuer, err := NewSymmJwtIssuer(issuerName, symmetricKey)
+	issuer, err := NewSymmIssuer(issuerName, symmetricKey)
 	require.NoError(t, err)
 	require.NotNil(t, issuer)
 
@@ -83,7 +83,7 @@ func TestIssueToken_withSymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
 }
 
 func TestIssueToken_withAsymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
-	issuer, err := NewAsymmJwtIssuer(issuerName, privateKey)
+	issuer, err := NewAsymmIssuer(issuerName, privateKey)
 	require.NoError(t, err)
 	require.NotNil(t, issuer)
 
@@ -94,11 +94,11 @@ func TestIssueToken_withAsymmKey_withInvalidTtl_shouldReturnError(t *testing.T) 
 }
 
 func TestIssueToken_withoutKey_shouldBeParsableWithUnsecuredVerifier(t *testing.T) {
-	issuer, err := NewUnsignedJwtIssuer(issuerName)
+	issuer, err := NewUnsignedIssuer(issuerName)
 	require.NoError(t, err)
 	require.NotNil(t, issuer)
 
-	verifier, err := NewUnsignedJwtVerifier()
+	verifier, err := NewUnsignedVerifier()
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
@@ -115,11 +115,11 @@ func TestIssueToken_withoutKey_shouldBeParsableWithUnsecuredVerifier(t *testing.
 }
 
 func TestIssueToken_withSymmKey_shouldBeParsableWithSymmVerifier(t *testing.T) {
-	issuer, err := NewSymmJwtIssuer(issuerName, symmetricKey)
+	issuer, err := NewSymmIssuer(issuerName, symmetricKey)
 	require.NoError(t, err)
 	require.NotNil(t, issuer)
 
-	verifier, err := NewSymmJwtVerifier(symmetricKey)
+	verifier, err := NewSymmVerifier(symmetricKey)
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
@@ -136,11 +136,11 @@ func TestIssueToken_withSymmKey_shouldBeParsableWithSymmVerifier(t *testing.T) {
 }
 
 func TestIssueToken_withAsymmKey_shouldBeParsableWithAsymmVerifier(t *testing.T) {
-	issuer, err := NewAsymmJwtIssuer(issuerName, privateKey)
+	issuer, err := NewAsymmIssuer(issuerName, privateKey)
 	require.NoError(t, err)
 	require.NotNil(t, issuer)
 
-	verifier, err := NewAsymmJwtVerifier(publicKey)
+	verifier, err := NewAsymmVerifier(publicKey)
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
@@ -157,7 +157,7 @@ func TestIssueToken_withAsymmKey_shouldBeParsableWithAsymmVerifier(t *testing.T)
 }
 
 func TestVerifyToken_withoutKey_whenTokenExpired_shouldReturnError(t *testing.T) {
-	verifier, err := NewUnsignedJwtVerifier()
+	verifier, err := NewUnsignedVerifier()
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
@@ -174,7 +174,7 @@ func TestVerifyToken_withoutKey_whenTokenExpired_shouldReturnError(t *testing.T)
 }
 
 func TestVerifyToken_withSymmKey_whenTokenExpired_shouldReturnError(t *testing.T) {
-	verifier, err := NewSymmJwtVerifier(symmetricKey)
+	verifier, err := NewSymmVerifier(symmetricKey)
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
@@ -191,7 +191,7 @@ func TestVerifyToken_withSymmKey_whenTokenExpired_shouldReturnError(t *testing.T
 }
 
 func TestVerifyToken_withAsymmKey_whenTokenExpired_shouldReturnError(t *testing.T) {
-	verifier, err := NewAsymmJwtVerifier(publicKey)
+	verifier, err := NewAsymmVerifier(publicKey)
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
@@ -208,7 +208,7 @@ func TestVerifyToken_withAsymmKey_whenTokenExpired_shouldReturnError(t *testing.
 }
 
 func TestVerifyToken_withoutKey_whenTokenNotYetUsable_shouldReturnError(t *testing.T) {
-	verifier, err := NewUnsignedJwtVerifier()
+	verifier, err := NewUnsignedVerifier()
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
@@ -225,7 +225,7 @@ func TestVerifyToken_withoutKey_whenTokenNotYetUsable_shouldReturnError(t *testi
 }
 
 func TestVerifyToken_withSymmKey_whenTokenNotYetUsable_shouldReturnError(t *testing.T) {
-	verifier, err := NewSymmJwtVerifier(symmetricKey)
+	verifier, err := NewSymmVerifier(symmetricKey)
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
@@ -242,7 +242,7 @@ func TestVerifyToken_withSymmKey_whenTokenNotYetUsable_shouldReturnError(t *test
 }
 
 func TestVerifyToken_withAsymmKey_whenTokenNotYetUsable_shouldReturnError(t *testing.T) {
-	verifier, err := NewAsymmJwtVerifier(publicKey)
+	verifier, err := NewAsymmVerifier(publicKey)
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 

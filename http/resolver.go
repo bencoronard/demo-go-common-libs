@@ -14,10 +14,10 @@ type HttpAuthHeaderResolver interface {
 }
 
 type httpAuthHeaderResolverImpl struct {
-	verifier xjwt.JwtVerifier
+	verifier xjwt.Verifier
 }
 
-func NewHttpAuthHeaderResolver(verifier xjwt.JwtVerifier) HttpAuthHeaderResolver {
+func NewHttpAuthHeaderResolver(verifier xjwt.Verifier) HttpAuthHeaderResolver {
 	return &httpAuthHeaderResolverImpl{verifier: verifier}
 }
 
