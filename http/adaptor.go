@@ -13,10 +13,10 @@ type AuthenticatedHandler func(
 )
 
 type Adapter struct {
-	resolver HttpAuthHeaderResolver
+	resolver AuthHeaderResolver
 }
 
-func NewAdapter(resolver HttpAuthHeaderResolver) *Adapter {
+func NewAdapter(resolver AuthHeaderResolver) *Adapter {
 	return &Adapter{resolver: resolver}
 }
 

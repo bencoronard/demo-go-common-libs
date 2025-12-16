@@ -9,19 +9,19 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type HttpAuthHeaderResolver interface {
+type AuthHeaderResolver interface {
 	ExtractClaims(r *http.Request) (jwt.MapClaims, error)
 }
 
-type httpAuthHeaderResolverImpl struct {
+type authHeaderResolverImpl struct {
 	verifier xjwt.Verifier
 }
 
-func NewHttpAuthHeaderResolver(verifier xjwt.Verifier) HttpAuthHeaderResolver {
-	return &httpAuthHeaderResolverImpl{verifier: verifier}
+func NewHttpAuthHeaderResolver(verifier xjwt.Verifier) AuthHeaderResolver {
+	return &authHeaderResolverImpl{verifier: verifier}
 }
 
-func (h *httpAuthHeaderResolverImpl) ExtractClaims(r *http.Request) (jwt.MapClaims, error) {
+func (h *authHeaderResolverImpl) ExtractClaims(r *http.Request) (jwt.MapClaims, error) {
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
 	if header == "" {
 		return nil, ErrMissingRequestHeader
