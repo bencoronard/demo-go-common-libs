@@ -4,7 +4,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
-	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -15,17 +15,17 @@ func ReadRsaPrivateKeyPkcs8(content string) (*rsa.PrivateKey, error) {
 
 	der, err := base64.StdEncoding.DecodeString(clean)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: failed to decode base64: %v", ErrInvalidKeyFormat, err)
 	}
 
 	key, err := x509.ParsePKCS8PrivateKey(der)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: failed to parse private key: %v", ErrInvalidKeyFormat, err)
 	}
 
 	rsaKey, ok := key.(*rsa.PrivateKey)
 	if !ok {
-		return nil, errors.New("not an RSA private key")
+		return nil, fmt.Errorf("%w: expected RSA private key, got %T", ErrKeyTypeMismatch, key)
 	}
 
 	return rsaKey, nil
@@ -38,17 +38,17 @@ func ReadRsaPublicKeyX509(content string) (*rsa.PublicKey, error) {
 
 	der, err := base64.StdEncoding.DecodeString(clean)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: failed to decode base64: %v", ErrInvalidKeyFormat, err)
 	}
 
 	key, err := x509.ParsePKIXPublicKey(der)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: failed to parse public key: %v", ErrInvalidKeyFormat, err)
 	}
 
 	rsaKey, ok := key.(*rsa.PublicKey)
 	if !ok {
-		return nil, errors.New("not an RSA public key")
+		return nil, fmt.Errorf("%w: expected RSA public key, got %T", ErrKeyTypeMismatch, key)
 	}
 
 	return rsaKey, nil
