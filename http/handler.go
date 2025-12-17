@@ -5,37 +5,29 @@ import (
 	"net/http"
 
 	"github.com/bencoronard/demo-go-common-libs/rfc9457"
-	"github.com/golang-jwt/jwt/v5"
 )
 
-type AuthenticatedHandler func(
-	http.ResponseWriter,
-	*http.Request,
-	jwt.MapClaims,
-)
-
-type Adapter struct {
-	resolver AuthHeaderResolver
+type ResponseErrorHandler interface {
+	RespondWithError(w http.ResponseWriter, err error) bool
 }
 
-func NewAdapter(resolver AuthHeaderResolver) *Adapter {
-	return &Adapter{resolver: resolver}
+type responseErrorHandlerImpl struct {
+	h ResponseErrorHandler
 }
 
-func (a *Adapter) WithAuthClaims(h AuthenticatedHandler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		claims, err := a.resolver.ExtractClaims(r)
-		if err != nil {
-			writeAuthError(w, err)
-			return
-		}
-
-		h(w, r, claims)
-	})
+func NewResponseErrorHandlerImpl() ResponseErrorHandler {
+	return &responseErrorHandlerImpl{}
 }
 
-func writeAuthError(w http.ResponseWriter, err error) {
+func (r *responseErrorHandlerImpl) RespondWithError(w http.ResponseWriter, err error) bool {
+	if ok := r.h.RespondWithError(w, err); ok {
+		return true
+	}
+	writeError(w, err)
+	return true
+}
+
+func writeError(w http.ResponseWriter, err error) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 
