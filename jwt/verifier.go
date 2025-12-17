@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"crypto/rsa"
-	"errors"
 	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -24,12 +23,10 @@ type asymmVerifier struct {
 	kf jwt.Keyfunc
 }
 
-const errFormat = "%w: %T"
-
 func NewUnsignedVerifier() (Verifier, error) {
 	return &unsignedVerifier{kf: func(t *jwt.Token) (any, error) {
 		if t.Method != jwt.SigningMethodNone {
-			return nil, fmt.Errorf(errFormat, ErrTokenUnexpectedSignMethod, t.Method)
+			return nil, fmt.Errorf("%w: expected none, got %T", ErrTokenVerificationFail, t.Method)
 		}
 		return jwt.UnsafeAllowNoneSignatureType, nil
 	}}, nil
@@ -37,12 +34,12 @@ func NewUnsignedVerifier() (Verifier, error) {
 
 func NewSymmVerifier(key []byte) (Verifier, error) {
 	if key == nil {
-		return nil, errors.New("symmetric key must not be nil")
+		return nil, fmt.Errorf("%w: key must not be nil", ErrConstructInstanceFail)
 	}
 
 	return &symmVerifier{kf: func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf(errFormat, ErrTokenUnexpectedSignMethod, t.Method)
+			return nil, fmt.Errorf("%w: expected HMAC, got %T", ErrTokenVerificationFail, t.Method)
 		}
 		return key, nil
 	}}, nil
@@ -50,11 +47,11 @@ func NewSymmVerifier(key []byte) (Verifier, error) {
 
 func NewAsymmVerifier(key *rsa.PublicKey) (Verifier, error) {
 	if key == nil {
-		return nil, errors.New("public key must not be nil")
+		return nil, fmt.Errorf("%w: public key must not be nil", ErrConstructInstanceFail)
 	}
 	return &asymmVerifier{kf: func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf(errFormat, ErrTokenUnexpectedSignMethod, t.Method)
+			return nil, fmt.Errorf("%w: expected RSA, got %T", ErrTokenVerificationFail, t.Method)
 		}
 		return key, nil
 	}}, nil
@@ -77,7 +74,7 @@ func verifyToken(tokenStr string, kf jwt.Keyfunc) (jwt.MapClaims, error) {
 
 	_, err := jwt.ParseWithClaims(tokenStr, claims, kf)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: parsing claims failed: %v", ErrTokenClaimsInvalid, err)
 	}
 
 	return claims, nil

@@ -42,22 +42,22 @@ func TestMain(m *testing.M) {
 
 func TestNewSymmVerifier_withNilSymmetricKey_shouldReturnError(t *testing.T) {
 	_, err := NewSymmVerifier(nil)
-	assert.EqualError(t, err, "symmetric key must not be nil")
+	assert.ErrorIs(t, err, ErrConstructInstanceFail)
 }
 
 func TestNewAsymmVerifier_withNilPublicKey_shouldReturnError(t *testing.T) {
 	_, err := NewAsymmVerifier(nil)
-	assert.EqualError(t, err, "public key must not be nil")
+	assert.ErrorIs(t, err, ErrConstructInstanceFail)
 }
 
 func TestNewSymmIssuer_withNilSymmetricKey_shouldReturnError(t *testing.T) {
 	_, err := NewSymmIssuer(issuerName, nil)
-	assert.EqualError(t, err, "symmetric key must not be nil")
+	assert.ErrorIs(t, err, ErrConstructInstanceFail)
 }
 
 func TestNewAsymmIssuer_withNilPrivateKey_shouldReturnError(t *testing.T) {
 	_, err := NewAsymmIssuer(issuerName, nil)
-	assert.EqualError(t, err, "private key must not be nil")
+	assert.ErrorIs(t, err, ErrConstructInstanceFail)
 }
 
 func TestIssueToken_withoutKey_withInvalidTtl_shouldReturnError(t *testing.T) {
@@ -66,9 +66,9 @@ func TestIssueToken_withoutKey_withInvalidTtl_shouldReturnError(t *testing.T) {
 	require.NotNil(t, issuer)
 
 	ttl := -1 * time.Second
-	_, err = issuer.IssueToken(nil, nil, nil, &ttl, nil)
+	_, err = issuer.IssueToken("", nil, nil, &ttl, nil)
 
-	assert.ErrorIs(t, err, ErrExpiredTokenIssueAttempted)
+	assert.ErrorIs(t, err, ErrTokenIssuanceFail)
 }
 
 func TestIssueToken_withSymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
@@ -77,9 +77,9 @@ func TestIssueToken_withSymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
 	require.NotNil(t, issuer)
 
 	ttl := -1 * time.Second
-	_, err = issuer.IssueToken(nil, nil, nil, &ttl, nil)
+	_, err = issuer.IssueToken("", nil, nil, &ttl, nil)
 
-	assert.ErrorIs(t, err, ErrExpiredTokenIssueAttempted)
+	assert.ErrorIs(t, err, ErrTokenIssuanceFail)
 }
 
 func TestIssueToken_withAsymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
@@ -88,9 +88,9 @@ func TestIssueToken_withAsymmKey_withInvalidTtl_shouldReturnError(t *testing.T) 
 	require.NotNil(t, issuer)
 
 	ttl := -1 * time.Second
-	_, err = issuer.IssueToken(nil, nil, nil, &ttl, nil)
+	_, err = issuer.IssueToken("", nil, nil, &ttl, nil)
 
-	assert.ErrorIs(t, err, ErrExpiredTokenIssueAttempted)
+	assert.ErrorIs(t, err, ErrTokenIssuanceFail)
 }
 
 func TestIssueToken_withoutKey_shouldBeParsableWithUnsecuredVerifier(t *testing.T) {
@@ -102,7 +102,7 @@ func TestIssueToken_withoutKey_shouldBeParsableWithUnsecuredVerifier(t *testing.
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
-	token, err := issuer.IssueToken(nil, nil, nil, nil, nil)
+	token, err := issuer.IssueToken("", nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, token)
 
@@ -123,7 +123,7 @@ func TestIssueToken_withSymmKey_shouldBeParsableWithSymmVerifier(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
-	token, err := issuer.IssueToken(nil, nil, nil, nil, nil)
+	token, err := issuer.IssueToken("", nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, token)
 
@@ -144,7 +144,7 @@ func TestIssueToken_withAsymmKey_shouldBeParsableWithAsymmVerifier(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
-	token, err := issuer.IssueToken(nil, nil, nil, nil, nil)
+	token, err := issuer.IssueToken("", nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, token)
 
@@ -170,7 +170,7 @@ func TestVerifyToken_withoutKey_whenTokenExpired_shouldReturnError(t *testing.T)
 	require.NoError(t, err)
 
 	_, err = verifier.VerifyToken(tokenStr)
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrTokenClaimsInvalid)
 }
 
 func TestVerifyToken_withSymmKey_whenTokenExpired_shouldReturnError(t *testing.T) {
@@ -187,7 +187,7 @@ func TestVerifyToken_withSymmKey_whenTokenExpired_shouldReturnError(t *testing.T
 	require.NoError(t, err)
 
 	_, err = verifier.VerifyToken(tokenStr)
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrTokenClaimsInvalid)
 }
 
 func TestVerifyToken_withAsymmKey_whenTokenExpired_shouldReturnError(t *testing.T) {
@@ -204,7 +204,7 @@ func TestVerifyToken_withAsymmKey_whenTokenExpired_shouldReturnError(t *testing.
 	require.NoError(t, err)
 
 	_, err = verifier.VerifyToken(tokenStr)
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrTokenClaimsInvalid)
 }
 
 func TestVerifyToken_withoutKey_whenTokenNotYetUsable_shouldReturnError(t *testing.T) {
@@ -221,7 +221,7 @@ func TestVerifyToken_withoutKey_whenTokenNotYetUsable_shouldReturnError(t *testi
 	require.NoError(t, err)
 
 	_, err = verifier.VerifyToken(tokenStr)
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrTokenClaimsInvalid)
 }
 
 func TestVerifyToken_withSymmKey_whenTokenNotYetUsable_shouldReturnError(t *testing.T) {
@@ -238,7 +238,7 @@ func TestVerifyToken_withSymmKey_whenTokenNotYetUsable_shouldReturnError(t *test
 	require.NoError(t, err)
 
 	_, err = verifier.VerifyToken(tokenStr)
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrTokenClaimsInvalid)
 }
 
 func TestVerifyToken_withAsymmKey_whenTokenNotYetUsable_shouldReturnError(t *testing.T) {
@@ -255,5 +255,5 @@ func TestVerifyToken_withAsymmKey_whenTokenNotYetUsable_shouldReturnError(t *tes
 	require.NoError(t, err)
 
 	_, err = verifier.VerifyToken(tokenStr)
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrTokenClaimsInvalid)
 }

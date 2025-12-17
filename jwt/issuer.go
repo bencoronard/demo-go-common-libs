@@ -2,7 +2,7 @@ package jwt
 
 import (
 	"crypto/rsa"
-	"errors"
+	"fmt"
 	"maps"
 	"time"
 
@@ -11,7 +11,7 @@ import (
 )
 
 type Issuer interface {
-	IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error)
+	IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error)
 }
 
 type unsignedIssuer struct {
@@ -34,19 +34,19 @@ func NewUnsignedIssuer(iss string) (Issuer, error) {
 
 func NewSymmIssuer(iss string, key []byte) (Issuer, error) {
 	if key == nil {
-		return nil, errors.New("symmetric key must not be nil")
+		return nil, fmt.Errorf("%w: key must not be nil", ErrConstructInstanceFail)
 	}
 	return &symmIssuer{iss: iss, key: key}, nil
 }
 
 func NewAsymmIssuer(iss string, key *rsa.PrivateKey) (Issuer, error) {
 	if key == nil {
-		return nil, errors.New("private key must not be nil")
+		return nil, fmt.Errorf("%w: private key must not be nil", ErrConstructInstanceFail)
 	}
 	return &asymmIssuer{iss: iss, key: key}, nil
 }
 
-func (i *unsignedIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
+func (i *unsignedIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
 	if err != nil {
 		return "", err
@@ -54,7 +54,7 @@ func (i *unsignedIssuer) IssueToken(sub *string, aud []string, claims map[string
 	return issueToken(jwt.SigningMethodNone, mc, jwt.UnsafeAllowNoneSignatureType)
 }
 
-func (i *symmIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
+func (i *symmIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
 	if err != nil {
 		return "", err
@@ -62,7 +62,7 @@ func (i *symmIssuer) IssueToken(sub *string, aud []string, claims map[string]any
 	return issueToken(jwt.SigningMethodHS256, mc, i.key)
 }
 
-func (i *asymmIssuer) IssueToken(sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
+func (i *asymmIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (string, error) {
 	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
 	if err != nil {
 		return "", err
@@ -70,7 +70,7 @@ func (i *asymmIssuer) IssueToken(sub *string, aud []string, claims map[string]an
 	return issueToken(jwt.SigningMethodRS256, mc, i.key)
 }
 
-func buildClaims(iss string, sub *string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (jwt.MapClaims, error) {
+func buildClaims(iss string, sub string, aud []string, claims map[string]any, ttl *time.Duration, nbf *time.Time) (jwt.MapClaims, error) {
 	now := time.Now()
 	mc := jwt.MapClaims{}
 
@@ -81,7 +81,7 @@ func buildClaims(iss string, sub *string, aud []string, claims map[string]any, t
 	if ttl != nil {
 		exp := now.Add(*ttl)
 		if exp.Before(now) {
-			return nil, ErrExpiredTokenIssueAttempted
+			return nil, fmt.Errorf("%w: expired token issuance attempted", ErrTokenIssuanceFail)
 		}
 		mc["exp"] = jwt.NewNumericDate(exp)
 	}
@@ -91,8 +91,8 @@ func buildClaims(iss string, sub *string, aud []string, claims map[string]any, t
 		return nil, err
 	}
 
-	if sub != nil {
-		mc["sub"] = *sub
+	if sub != "" {
+		mc["sub"] = sub
 	}
 
 	mc["iss"] = iss

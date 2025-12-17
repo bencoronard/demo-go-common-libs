@@ -3,8 +3,9 @@ package jwt
 import "errors"
 
 var (
-	ErrTokenUnexpectedSignMethod  = errors.New("token has unexpected signing method")
-	ErrTokenClaimsInvalid         = errors.New("token has invalid claims")
-	ErrExpiredTokenIssueAttempted = errors.New("expired token issuance attempted")
-	ErrTokenMalformed             = errors.New("token is malformed")
+	ErrConstructInstanceFail = errors.New("unable to create an instance")
+	ErrTokenVerificationFail = errors.New("token verification failed")
+	ErrTokenIssuanceFail     = errors.New("expired token issuance attempted")
+	ErrTokenClaimsInvalid    = errors.New("token has invalid claims")
+	ErrTokenMalformed        = errors.New("token is malformed")
 )

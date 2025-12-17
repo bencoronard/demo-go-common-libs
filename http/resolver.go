@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -34,7 +35,7 @@ func (h *authHeaderResolverImpl) ExtractClaims(r *http.Request) (jwt.MapClaims, 
 
 	sub, _ := claims["sub"].(string)
 	if sub == "" || !regexp.MustCompile(`^\d+$`).MatchString(sub) {
-		return nil, xjwt.ErrTokenMalformed
+		return nil, fmt.Errorf("%w: expected integer, got %q", xjwt.ErrTokenMalformed, sub)
 	}
 
 	return claims, nil
