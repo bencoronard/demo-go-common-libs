@@ -8,7 +8,7 @@ import (
 )
 
 type ResponseErrorHandler interface {
-	RespondWithError(w http.ResponseWriter, err error) bool
+	RespondWithError(w http.ResponseWriter, r *http.Request, err error) bool
 }
 
 type responseErrorHandlerImpl struct {
@@ -19,15 +19,15 @@ func NewResponseErrorHandlerImpl() ResponseErrorHandler {
 	return &responseErrorHandlerImpl{}
 }
 
-func (r *responseErrorHandlerImpl) RespondWithError(w http.ResponseWriter, err error) bool {
-	if ok := r.h.RespondWithError(w, err); ok {
+func (h *responseErrorHandlerImpl) RespondWithError(w http.ResponseWriter, r *http.Request, err error) bool {
+	if ok := h.h.RespondWithError(w, r, err); ok {
 		return true
 	}
-	writeError(w, err)
+	writeError(w, r, err)
 	return true
 }
 
-func writeError(w http.ResponseWriter, err error) {
+func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 
