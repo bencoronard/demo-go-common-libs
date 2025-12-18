@@ -25,7 +25,7 @@ func NewHttpAuthHeaderResolver(verifier xjwt.Verifier) AuthHeaderResolver {
 func (h *authHeaderResolverImpl) ExtractClaims(r *http.Request) (jwt.MapClaims, error) {
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
 	if header == "" {
-		return nil, ErrMissingRequestHeader
+		return nil, fmt.Errorf("%w: missing Authorization header", ErrMissingRequestHeader)
 	}
 
 	claims, err := h.verifier.VerifyToken(header[len("Bearer "):])
