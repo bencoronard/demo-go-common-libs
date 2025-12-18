@@ -16,24 +16,23 @@ func ApiKeyMiddleware(apiKey string) func(http.Handler) http.Handler {
 
 			key := strings.TrimSpace(r.Header.Get(constant.MSG_HEADER_API_KEY))
 			if key == "" {
-				w.Header().Set("Content-Type", "application/problem+json")
-				w.WriteHeader(http.StatusUnauthorized)
-				enc := json.NewEncoder(w)
-				enc.SetEscapeHTML(false)
-				enc.Encode(rfc9457.ForStatusAndDetail(http.StatusUnauthorized, "Missing API key"))
+				sendErrorResponse(w, http.StatusUnauthorized, "Missing API key")
 				return
 			}
 
 			if subtle.ConstantTimeCompare([]byte(key), []byte(apiKey)) != 1 {
-				w.Header().Set("Content-Type", "application/problem+json")
-				w.WriteHeader(http.StatusUnauthorized)
-				enc := json.NewEncoder(w)
-				enc.SetEscapeHTML(false)
-				enc.Encode(rfc9457.ForStatusAndDetail(http.StatusUnauthorized, "Invalid API key"))
+				sendErrorResponse(w, http.StatusUnauthorized, "Invalid API key")
 				return
 			}
 
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func sendErrorResponse(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(status)
+	enc := json.NewEncoder(w)
+	enc.Encode(rfc9457.ForStatusAndDetail(status, msg))
 }
