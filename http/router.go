@@ -15,8 +15,8 @@ type Router interface {
 	Serve(l net.Listener) error
 	Shutdown(ctx context.Context) error
 	ListeningPort() int
-	RegisterRoutes() error
-	RegisterMiddlewares() error
+	RegisterRoutes()
+	RegisterMiddlewares()
 }
 
 func Start(lc fx.Lifecycle, sd fx.Shutdowner, r Router) {
