@@ -11,12 +11,12 @@ import (
 )
 
 type Router interface {
+	ListeningPort() int
 	Listen(port int) (net.Listener, error)
 	Serve(l net.Listener) error
 	Shutdown(ctx context.Context) error
-	ListeningPort() int
-	RegisterRoutes()
 	RegisterMiddlewares()
+	RegisterRoutes()
 }
 
 func Start(lc fx.Lifecycle, sd fx.Shutdowner, r Router) {
