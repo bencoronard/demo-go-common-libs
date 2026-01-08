@@ -117,7 +117,7 @@ func initClient(addr string) (*vault.Client, error) {
 }
 
 func authWithUserPass(ctx context.Context, vc *vault.Client, usr, psw string) error {
-	auth, err := authUsrPsw.NewUserPassAuth(usr, &authUsrPsw.Password{FromString: psw}, authAppRole.WithWrappingToken())
+	auth, err := authUsrPsw.NewUserPassAuth(usr, &authUsrPsw.Password{FromString: psw})
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func authWithUserPass(ctx context.Context, vc *vault.Client, usr, psw string) er
 }
 
 func authWithAppRole(ctx context.Context, vc *vault.Client, roleID, secretID string) error {
-	auth, err := authAppRole.NewAppRoleAuth(roleID, &authAppRole.SecretID{FromString: secretID}, authAppRole.WithWrappingToken())
+	auth, err := authAppRole.NewAppRoleAuth(roleID, &authAppRole.SecretID{FromString: secretID})
 	if err != nil {
 		return err
 	}
