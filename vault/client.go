@@ -8,7 +8,9 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"go.uber.org/fx"
 
-	auth "github.com/hashicorp/vault/api/auth/kubernetes"
+	authAppRole "github.com/hashicorp/vault/api/auth/approle"
+	authK8s "github.com/hashicorp/vault/api/auth/kubernetes"
+	authUsrPsw "github.com/hashicorp/vault/api/auth/userpass"
 )
 
 type VaultClient interface {
@@ -20,10 +22,7 @@ type client struct {
 }
 
 func NewVaultTokenClient(lc fx.Lifecycle, addr, token string) (VaultClient, error) {
-	cfg := vault.DefaultConfig()
-	cfg.Address = addr
-
-	vc, err := vault.NewClient(cfg)
+	vc, err := initClient(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -33,52 +32,47 @@ func NewVaultTokenClient(lc fx.Lifecycle, addr, token string) (VaultClient, erro
 	return &client{vault: vc}, nil
 }
 
-func NewVaultAppRoleClient(lc fx.Lifecycle, addr, roleID, secretID string) (VaultClient, error) {
-	cfg := vault.DefaultConfig()
-	cfg.Address = addr
-
-	vc, err := vault.NewClient(cfg)
+func NewVaultUserPassClient(lc fx.Lifecycle, addr, usr, psw string) (VaultClient, error) {
+	vc, err := initClient(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	data := map[string]any{
-		"role_id":   roleID,
-		"secret_id": secretID,
-	}
-
-	resp, err := vc.Logical().WriteWithContext(context.Background(), "auth/approle/login", data)
-	if err != nil {
-		return nil, err
-	}
-
-	vc.SetToken(resp.Auth.ClientToken)
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return authWithUserPass(ctx, vc, usr, psw)
+		},
+	})
 
 	return &client{vault: vc}, nil
 }
 
-func NewVaultK8sClient(lc fx.Lifecycle, addr, role, tokenPath string) (VaultClient, error) {
-	cfg := vault.DefaultConfig()
-	cfg.Address = addr
-
-	vc, err := vault.NewClient(cfg)
+func NewVaultAppRoleClient(lc fx.Lifecycle, addr, roleID, secretID string) (VaultClient, error) {
+	vc, err := initClient(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	k8sAuth, err := auth.NewKubernetesAuth(role, auth.WithMountPath(tokenPath))
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return authWithAppRole(ctx, vc, roleID, secretID)
+		},
+	})
+
+	return &client{vault: vc}, nil
+}
+
+func NewVaultK8sClient(lc fx.Lifecycle, addr, role, token string) (VaultClient, error) {
+	vc, err := initClient(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	authInfo, err := vc.Auth().Login(context.Background(), k8sAuth)
-	if err != nil {
-		return nil, err
-	}
-
-	if authInfo == nil {
-		return nil, fmt.Errorf("%w: no auth info returned from kubernetes login", ErrAuthenticationFail)
-	}
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return authWithK8s(ctx, vc, role, token)
+		},
+	})
 
 	return &client{vault: vc}, nil
 }
@@ -108,4 +102,67 @@ func (c *client) GetSecret(ctx context.Context, path string, target any) error {
 	}
 
 	return decoder.Decode(data)
+}
+
+func initClient(addr string) (*vault.Client, error) {
+	cfg := vault.DefaultConfig()
+	cfg.Address = addr
+
+	client, err := vault.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func authWithUserPass(ctx context.Context, vc *vault.Client, usr, psw string) error {
+	auth, err := authUsrPsw.NewUserPassAuth(usr, &authUsrPsw.Password{FromString: psw}, authAppRole.WithWrappingToken())
+	if err != nil {
+		return err
+	}
+
+	authInfo, err := vc.Auth().Login(context.Background(), auth)
+	if err != nil {
+		return err
+	}
+	if authInfo == nil {
+		return fmt.Errorf("%w: no auth info returned from UserPass login", ErrAuthenticationFail)
+	}
+
+	return nil
+}
+
+func authWithAppRole(ctx context.Context, vc *vault.Client, roleID, secretID string) error {
+	auth, err := authAppRole.NewAppRoleAuth(roleID, &authAppRole.SecretID{FromString: secretID}, authAppRole.WithWrappingToken())
+	if err != nil {
+		return err
+	}
+
+	authInfo, err := vc.Auth().Login(context.Background(), auth)
+	if err != nil {
+		return err
+	}
+	if authInfo == nil {
+		return fmt.Errorf("%w: no auth info returned from AppRole login", ErrAuthenticationFail)
+	}
+
+	return nil
+}
+
+func authWithK8s(ctx context.Context, vc *vault.Client, role, token string) error {
+	auth, err := authK8s.NewKubernetesAuth(role, authK8s.WithServiceAccountToken(token))
+	if err != nil {
+		return err
+	}
+
+	authInfo, err := vc.Auth().Login(ctx, auth)
+	if err != nil {
+		return err
+	}
+	if authInfo == nil {
+		return fmt.Errorf("%w: no auth info returned from Kubernetes login", ErrAuthenticationFail)
+	}
+
+	return nil
 }
