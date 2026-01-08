@@ -122,7 +122,7 @@ func authWithUserPass(ctx context.Context, vc *vault.Client, usr, psw string) er
 		return err
 	}
 
-	authInfo, err := vc.Auth().Login(context.Background(), auth)
+	authInfo, err := vc.Auth().Login(ctx, auth)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func authWithAppRole(ctx context.Context, vc *vault.Client, roleID, secretID str
 		return err
 	}
 
-	authInfo, err := vc.Auth().Login(context.Background(), auth)
+	authInfo, err := vc.Auth().Login(ctx, auth)
 	if err != nil {
 		return err
 	}
