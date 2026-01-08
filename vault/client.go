@@ -117,7 +117,7 @@ func initClient(addr string) (*vault.Client, error) {
 }
 
 func authWithUserPass(ctx context.Context, vc *vault.Client, usr, psw string) error {
-	auth, err := authUsrPsw.NewUserPassAuth(usr, &authUsrPsw.Password{FromString: psw})
+	auth, err := authUsrPsw.NewUserpassAuth(usr, &authUsrPsw.Password{FromString: psw})
 	if err != nil {
 		return err
 	}
