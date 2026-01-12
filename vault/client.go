@@ -14,15 +14,20 @@ import (
 type Client interface {
 	ReadSecret(ctx context.Context, path string, target any) error
 	authenticate(ctx context.Context) error
+	client() *vault.Client
 }
 
 type client struct {
-	vault *vault.Client
-	auth  vault.AuthMethod
+	vc   *vault.Client
+	auth vault.AuthMethod
+}
+
+func (c *client) client() *vault.Client {
+	return c.vc
 }
 
 func (c *client) authenticate(ctx context.Context) error {
-	authInfo, err := c.vault.Auth().Login(ctx, c.auth)
+	authInfo, err := c.vc.Auth().Login(ctx, c.auth)
 	if err != nil {
 		return err
 	}
@@ -33,7 +38,7 @@ func (c *client) authenticate(ctx context.Context) error {
 }
 
 func (c *client) ReadSecret(ctx context.Context, path string, target any) error {
-	secret, err := c.vault.Logical().ReadWithContext(ctx, path)
+	secret, err := c.vc.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -73,7 +78,7 @@ func NewK8sClient(lc fx.Lifecycle, addr, role, mountPath string) (Client, error)
 		return nil, err
 	}
 
-	c := client{vault: vc, auth: auth}
+	c := client{vc: vc, auth: auth}
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {

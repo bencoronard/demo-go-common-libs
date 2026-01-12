@@ -8,25 +8,29 @@ import (
 )
 
 type VaultClientManager interface {
-	Start(ctx context.Context) error
-	Stop(ctx context.Context) error
+	renewToken(ctx context.Context) error
 }
 
 type vaultClientManager struct {
-	client Client
-	mu     sync.Mutex
+	vc Client
+	mu sync.Mutex
 }
 
-func (v *vaultClientManager) Start(ctx context.Context) error {
-	panic("unimplemented")
+func (m *vaultClientManager) renewToken(ctx context.Context) error {
+	return m.vc.authenticate(ctx)
 }
 
-func (v *vaultClientManager) Stop(ctx context.Context) error {
-	panic("unimplemented")
-}
+func NewVaultClientManager(lc fx.Lifecycle, vc Client) (VaultClientManager, error) {
+	m := vaultClientManager{vc: vc}
 
-func NewVaultTokenManager(lc fx.Lifecycle, vc Client) (VaultClientManager, error) {
-	return &vaultClientManager{
-		client: vc,
-	}, nil
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return nil
+		},
+	})
+
+	return &m, nil
 }
