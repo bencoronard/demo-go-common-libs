@@ -13,7 +13,7 @@ import (
 
 type Client interface {
 	ReadSecret(ctx context.Context, path string, target any) error
-	authenticate(ctx context.Context) error
+	authenticate(ctx context.Context) (*vault.Secret, error)
 	client() *vault.Client
 }
 
@@ -26,15 +26,15 @@ func (c *client) client() *vault.Client {
 	return c.vc
 }
 
-func (c *client) authenticate(ctx context.Context) error {
-	authInfo, err := c.vc.Auth().Login(ctx, c.auth)
+func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
+	auth, err := c.vc.Auth().Login(ctx, c.auth)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if authInfo == nil {
-		return fmt.Errorf("%w: no auth info returned", ErrAuthenticationFail)
+	if auth == nil {
+		return nil, fmt.Errorf("%w: no authorization returned", ErrAuthenticationFail)
 	}
-	return nil
+	return auth, nil
 }
 
 func (c *client) ReadSecret(ctx context.Context, path string, target any) error {
@@ -82,7 +82,14 @@ func NewK8sClient(lc fx.Lifecycle, addr, role, mountPath string) (Client, error)
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			return c.authenticate(ctx)
+			_, err := c.authenticate(ctx)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
 		},
 	})
 
