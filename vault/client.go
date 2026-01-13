@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"log"
 
 	vault "github.com/hashicorp/vault/api"
 	"github.com/mitchellh/mapstructure"
@@ -23,15 +24,15 @@ type client struct {
 	auth vault.AuthMethod
 }
 
-func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
-	auth, err := c.vc.Auth().Login(ctx, c.auth)
+func (c *client) login(ctx context.Context) (*vault.Secret, error) {
+	authInfo, err := c.vc.Auth().Login(ctx, c.auth)
 	if err != nil {
 		return nil, err
 	}
-	if auth == nil {
-		return nil, fmt.Errorf("%w: no authorization returned", ErrAuthenticationFail)
+	if authInfo == nil {
+		return nil, fmt.Errorf("%w: no auth info returned", ErrAuthenticationFail)
 	}
-	return auth, nil
+	return authInfo, nil
 }
 
 func (c *client) ReadSecret(ctx context.Context, path string, target any) error {
@@ -74,6 +75,56 @@ func (c *client) WatchTokenLifecycle(lc fx.Lifecycle, sd fx.Shutdowner) error {
 	return nil
 }
 
+func (c *client) renewToken(ctx context.Context) {
+	for {
+		if err := c.manageTokenLifecycle(); err != nil {
+			log.Fatalf("unable to start managing token lifecycle: %v", err)
+		}
+
+		_, err := c.login(ctx)
+		if err != nil {
+			log.Fatalf("unable to authenticate to Vault: %v", err)
+		}
+	}
+}
+
+func (c *client) manageTokenLifecycle() error {
+	token, err := c.vc.Auth().Token().LookupSelf()
+	if err != nil {
+		return err
+	}
+
+	if !token.Auth.Renewable {
+		log.Printf("Token is not renewable. Re-attempting login")
+		return nil
+	}
+
+	watcher, err := c.vc.NewLifetimeWatcher(&vault.LifetimeWatcherInput{
+		Secret:    token,
+		Increment: 3600,
+	})
+	if err != nil {
+		return err
+	}
+
+	go watcher.Start()
+	defer watcher.Stop()
+
+	for {
+		select {
+		case err := <-watcher.DoneCh():
+			if err != nil {
+				log.Printf("Failed to renew token: %v. Re-attempting login", err)
+				return nil
+			}
+			log.Printf("Token can no longer be renewed. Re-attempting login.")
+			return nil
+		case renewal := <-watcher.RenewCh():
+			log.Printf("Successfully renewed: %#v", renewal)
+		}
+	}
+}
+
 func NewK8sClient(lc fx.Lifecycle, addr, role, mountPath string) (Client, error) {
 	cfg := vault.DefaultConfig()
 	cfg.Address = addr
@@ -92,7 +143,7 @@ func NewK8sClient(lc fx.Lifecycle, addr, role, mountPath string) (Client, error)
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			_, err := c.authenticate(ctx)
+			_, err := c.login(ctx)
 			if err != nil {
 				return err
 			}
@@ -122,19 +173,6 @@ func NewAppRoleClient(lc fx.Lifecycle, addr, roleID, secretID string) (Client, e
 
 	c := client{vc: vc, auth: auth}
 
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			_, err := c.authenticate(ctx)
-			if err != nil {
-				return err
-			}
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
-		},
-	})
-
 	return &c, nil
 }
 
@@ -153,19 +191,6 @@ func NewUserPassClient(lc fx.Lifecycle, addr, usr, psw string) (Client, error) {
 	}
 
 	c := client{vc: vc, auth: auth}
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			_, err := c.authenticate(ctx)
-			if err != nil {
-				return err
-			}
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
-		},
-	})
 
 	return &c, nil
 }
