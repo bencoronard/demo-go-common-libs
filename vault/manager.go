@@ -41,7 +41,10 @@ func (m *vaultClientManager) manageTokenLifecycle() error {
 		return nil
 	}
 
-	watcher, err := m.vc.client().NewLifetimeWatcher(&vault.LifetimeWatcherInput{})
+	watcher, err := m.vc.client().NewLifetimeWatcher(&vault.LifetimeWatcherInput{
+		Secret:    token,
+		Increment: 3600,
+	})
 	if err != nil {
 		return err
 	}
