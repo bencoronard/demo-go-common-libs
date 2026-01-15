@@ -179,3 +179,28 @@ func NewUserPassClient(lc fx.Lifecycle, addr, usr, psw string) (Client, error) {
 	}
 	return newClient(lc, addr, auth)
 }
+
+func NewTokenClient(lc fx.Lifecycle, addr, token string) (Client, error) {
+	cfg := vault.DefaultConfig()
+	cfg.Address = addr
+
+	vc, err := vault.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	vc.SetToken(token)
+
+	c := client{vc: vc}
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			_, err := vc.Auth().Token().LookupSelfWithContext(ctx)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	})
+
+	return &c, nil
+}
