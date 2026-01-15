@@ -3,7 +3,6 @@ package vault
 import (
 	"context"
 	"fmt"
-	"log"
 
 	vault "github.com/hashicorp/vault/api"
 	"github.com/mitchellh/mapstructure"
@@ -16,23 +15,12 @@ import (
 
 type Client interface {
 	ReadSecret(ctx context.Context, path string, target any) error
-	WatchTokenLifecycle(lc fx.Lifecycle, sd fx.Shutdowner) error
+	WatchTokenLifecycle(lc fx.Lifecycle) error
 }
 
 type client struct {
 	vc   *vault.Client
 	auth vault.AuthMethod
-}
-
-func (c *client) login(ctx context.Context) (*vault.Secret, error) {
-	authInfo, err := c.vc.Auth().Login(ctx, c.auth)
-	if err != nil {
-		return nil, err
-	}
-	if authInfo == nil {
-		return nil, fmt.Errorf("%w: no auth info returned", ErrAuthenticationFail)
-	}
-	return authInfo, nil
 }
 
 func (c *client) ReadSecret(ctx context.Context, path string, target any) error {
@@ -62,40 +50,60 @@ func (c *client) ReadSecret(ctx context.Context, path string, target any) error 
 	return decoder.Decode(data)
 }
 
-func (c *client) WatchTokenLifecycle(lc fx.Lifecycle, sd fx.Shutdowner) error {
+func (c *client) WatchTokenLifecycle(lc fx.Lifecycle) error {
+	renewCtx, cancel := context.WithCancel(context.Background())
+
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			go c.renewToken(ctx)
+			go c.runTokenRenewalLoop(renewCtx)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
+			cancel()
 			return nil
 		},
 	})
+
 	return nil
 }
 
-func (c *client) renewToken(ctx context.Context) {
-	for {
-		if err := c.manageTokenLifecycle(); err != nil {
-			log.Fatalf("unable to start managing token lifecycle: %v", err)
-		}
+func (c *client) login(ctx context.Context) (*vault.Secret, error) {
+	authInfo, err := c.vc.Auth().Login(ctx, c.auth)
+	if err != nil {
+		return nil, err
+	}
+	if authInfo == nil {
+		return nil, fmt.Errorf("%w: no auth info returned", ErrAuthenticationFail)
+	}
+	return authInfo, nil
+}
 
-		_, err := c.login(ctx)
-		if err != nil {
-			log.Fatalf("unable to authenticate to Vault: %v", err)
+func (c *client) runTokenRenewalLoop(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// Renewal
+			if err := c.manageTokenLifecycle(ctx); err != nil {
+				return
+			}
+			// Re-authentication
+			_, err := c.login(ctx)
+			if err != nil {
+				continue
+			}
 		}
 	}
 }
 
-func (c *client) manageTokenLifecycle() error {
-	token, err := c.vc.Auth().Token().LookupSelf()
+func (c *client) manageTokenLifecycle(ctx context.Context) error {
+	token, err := c.vc.Auth().Token().LookupSelfWithContext(ctx)
 	if err != nil {
 		return err
 	}
 
 	if !token.Auth.Renewable {
-		log.Printf("Token is not renewable. Re-attempting login")
 		return nil
 	}
 
@@ -112,15 +120,14 @@ func (c *client) manageTokenLifecycle() error {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return ctx.Err()
 		case err := <-watcher.DoneCh():
 			if err != nil {
-				log.Printf("Failed to renew token: %v. Re-attempting login", err)
 				return nil
 			}
-			log.Printf("Token can no longer be renewed. Re-attempting login.")
 			return nil
-		case renewal := <-watcher.RenewCh():
-			log.Printf("Successfully renewed: %#v", renewal)
+		case <-watcher.RenewCh():
 		}
 	}
 }
@@ -173,6 +180,19 @@ func NewAppRoleClient(lc fx.Lifecycle, addr, roleID, secretID string) (Client, e
 
 	c := client{vc: vc, auth: auth}
 
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			_, err := c.login(ctx)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
+		},
+	})
+
 	return &c, nil
 }
 
@@ -191,6 +211,19 @@ func NewUserPassClient(lc fx.Lifecycle, addr, usr, psw string) (Client, error) {
 	}
 
 	c := client{vc: vc, auth: auth}
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			_, err := c.login(ctx)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
+		},
+	})
 
 	return &c, nil
 }
