@@ -107,10 +107,7 @@ func (c *client) manageTokenLifecycle(ctx context.Context) error {
 		return nil
 	}
 
-	watcher, err := c.vc.NewLifetimeWatcher(&vault.LifetimeWatcherInput{
-		Secret:    token,
-		Increment: 3600,
-	})
+	watcher, err := c.vc.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: token})
 	if err != nil {
 		return err
 	}
@@ -132,7 +129,7 @@ func (c *client) manageTokenLifecycle(ctx context.Context) error {
 	}
 }
 
-func NewK8sClient(lc fx.Lifecycle, addr, role, mountPath string) (Client, error) {
+func newClient(lc fx.Lifecycle, addr string, auth vault.AuthMethod) (Client, error) {
 	cfg := vault.DefaultConfig()
 	cfg.Address = addr
 
@@ -141,89 +138,44 @@ func NewK8sClient(lc fx.Lifecycle, addr, role, mountPath string) (Client, error)
 		return nil, err
 	}
 
+	c := client{vc: vc, auth: auth}
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			_, err := c.login(ctx)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
+		},
+	})
+
+	return &c, nil
+}
+
+func NewK8sClient(lc fx.Lifecycle, addr, role, mountPath string) (Client, error) {
 	auth, err := authK8s.NewKubernetesAuth(role, authK8s.WithServiceAccountTokenPath(mountPath))
 	if err != nil {
 		return nil, err
 	}
-
-	c := client{vc: vc, auth: auth}
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			_, err := c.login(ctx)
-			if err != nil {
-				return err
-			}
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
-		},
-	})
-
-	return &c, nil
+	return newClient(lc, addr, auth)
 }
 
 func NewAppRoleClient(lc fx.Lifecycle, addr, roleID, secretID string) (Client, error) {
-	cfg := vault.DefaultConfig()
-	cfg.Address = addr
-
-	vc, err := vault.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-
 	auth, err := authAppRole.NewAppRoleAuth(roleID, &authAppRole.SecretID{FromString: secretID})
 	if err != nil {
 		return nil, err
 	}
-
-	c := client{vc: vc, auth: auth}
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			_, err := c.login(ctx)
-			if err != nil {
-				return err
-			}
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
-		},
-	})
-
-	return &c, nil
+	return newClient(lc, addr, auth)
 }
 
 func NewUserPassClient(lc fx.Lifecycle, addr, usr, psw string) (Client, error) {
-	cfg := vault.DefaultConfig()
-	cfg.Address = addr
-
-	vc, err := vault.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-
 	auth, err := authUsrPsw.NewUserpassAuth(usr, &authUsrPsw.Password{FromString: psw})
 	if err != nil {
 		return nil, err
 	}
-
-	c := client{vc: vc, auth: auth}
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			_, err := c.login(ctx)
-			if err != nil {
-				return err
-			}
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
-		},
-	})
-
-	return &c, nil
+	return newClient(lc, addr, auth)
 }
