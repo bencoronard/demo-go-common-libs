@@ -20,7 +20,7 @@ const (
 	DESC Direction = "DESC"
 )
 
-func NewPageable(page, size int) *Pageable {
+func NewPageable(page, size int) Pageable {
 	if page < 0 {
 		page = 0
 	}
@@ -29,32 +29,41 @@ func NewPageable(page, size int) *Pageable {
 		size = 20
 	}
 
-	return &Pageable{
+	return Pageable{
 		Page: page,
 		Size: size,
-		Sort: []Sort{},
+		Sort: make([]Sort, 0),
 	}
 }
 
-func (p *Pageable) WithSort(prop string, dir Direction) *Pageable {
-	p.Sort = append(p.Sort, Sort{
+func (p Pageable) WithSort(prop string, dir Direction) Pageable {
+	newSort := make([]Sort, len(p.Sort), len(p.Sort)+1)
+
+	copy(newSort, p.Sort)
+
+	newSort = append(newSort, Sort{
 		Property:  prop,
 		Direction: dir,
 	})
-	return p
+
+	return Pageable{
+		Page: p.Page,
+		Size: p.Size,
+		Sort: newSort,
+	}
 }
 
-func (p *Pageable) GetOffset() int {
+func (p Pageable) GetOffset() int {
 	return p.Page * p.Size
 }
 
-func (p *Pageable) GetLimit() int {
+func (p Pageable) GetLimit() int {
 	return p.Size
 }
 
 type Slice[T any] struct {
 	Content          []T
-	Pageable         *Pageable
+	Pageable         Pageable
 	Size             int
 	NumberOfElements int
 	HasNext          bool
@@ -63,7 +72,7 @@ type Slice[T any] struct {
 	IsLast           bool
 }
 
-func NewSlice[T any](content []T, pageable *Pageable, totalFetched int) *Slice[T] {
+func NewSlice[T any](content []T, pageable Pageable, totalFetched int) Slice[T] {
 	hasNext := totalFetched > pageable.Size
 
 	actualContent := content
@@ -71,7 +80,7 @@ func NewSlice[T any](content []T, pageable *Pageable, totalFetched int) *Slice[T
 		actualContent = content[:pageable.Size]
 	}
 
-	return &Slice[T]{
+	return Slice[T]{
 		Content:          actualContent,
 		Pageable:         pageable,
 		Size:             pageable.Size,
@@ -83,27 +92,27 @@ func NewSlice[T any](content []T, pageable *Pageable, totalFetched int) *Slice[T
 	}
 }
 
-func (s *Slice[T]) NextPageable() *Pageable {
+func (s Slice[T]) NextPageable() (Pageable, bool) {
 	if !s.HasNext {
-		return nil
+		return Pageable{}, false
 	}
-	return NewPageable(s.Pageable.Page+1, s.Pageable.Size)
+	return NewPageable(s.Pageable.Page+1, s.Pageable.Size), true
 }
 
-func (s *Slice[T]) PreviousPageable() *Pageable {
+func (s Slice[T]) PreviousPageable() (Pageable, bool) {
 	if !s.HasPrev {
-		return nil
+		return Pageable{}, false
 	}
-	return NewPageable(s.Pageable.Page-1, s.Pageable.Size)
+	return NewPageable(s.Pageable.Page-1, s.Pageable.Size), true
 }
 
-func (s *Slice[T]) Map(fn func(T) T) *Slice[T] {
+func (s Slice[T]) Map(fn func(T) T) Slice[T] {
 	mapped := make([]T, len(s.Content))
 	for i, item := range s.Content {
 		mapped[i] = fn(item)
 	}
 
-	return &Slice[T]{
+	return Slice[T]{
 		Content:          mapped,
 		Pageable:         s.Pageable,
 		Size:             s.Size,
@@ -116,28 +125,30 @@ func (s *Slice[T]) Map(fn func(T) T) *Slice[T] {
 }
 
 type Page[T any] struct {
-	*Slice[T]
+	Slice[T]
 	TotalElements int
 	TotalPages    int
 }
 
-func NewPage[T any](content []T, pageable *Pageable, totalElements int) *Page[T] {
-	totalPages := int(math.Ceil(float64(totalElements) / float64(pageable.Size)))
-	hasNext := pageable.Page < totalPages-1
-
-	slice := &Slice[T]{
-		Content:          content,
-		Pageable:         pageable,
-		Size:             pageable.Size,
-		NumberOfElements: len(content),
-		HasNext:          hasNext,
-		HasPrev:          pageable.Page > 0,
-		IsFirst:          pageable.Page == 0,
-		IsLast:           pageable.Page >= totalPages-1,
+func NewPage[T any](content []T, pageable Pageable, totalElements int) Page[T] {
+	totalPages := 0
+	if pageable.Size > 0 {
+		totalPages = int(math.Ceil(float64(totalElements) / float64(pageable.Size)))
 	}
 
-	return &Page[T]{
-		Slice:         slice,
+	hasNext := pageable.Page < totalPages-1
+
+	return Page[T]{
+		Slice: Slice[T]{
+			Content:          content,
+			Pageable:         pageable,
+			Size:             pageable.Size,
+			NumberOfElements: len(content),
+			HasNext:          hasNext,
+			HasPrev:          pageable.Page > 0,
+			IsFirst:          pageable.Page == 0,
+			IsLast:           pageable.Page >= totalPages-1,
+		},
 		TotalElements: totalElements,
 		TotalPages:    totalPages,
 	}
