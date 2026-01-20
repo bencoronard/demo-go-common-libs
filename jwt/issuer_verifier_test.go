@@ -60,39 +60,6 @@ func TestNewAsymmIssuer_withNilPrivateKey_shouldReturnError(t *testing.T) {
 	assert.ErrorIs(t, err, ErrConstructInstanceFail)
 }
 
-func TestIssueToken_withoutKey_withInvalidTtl_shouldReturnError(t *testing.T) {
-	issuer, err := NewUnsignedIssuer(issuerName)
-	require.NoError(t, err)
-	require.NotNil(t, issuer)
-
-	ttl := -1 * time.Second
-	_, err = issuer.IssueToken("", nil, nil, &ttl, nil)
-
-	assert.ErrorIs(t, err, ErrTokenIssuanceFail)
-}
-
-func TestIssueToken_withSymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
-	issuer, err := NewSymmIssuer(issuerName, symmetricKey)
-	require.NoError(t, err)
-	require.NotNil(t, issuer)
-
-	ttl := -1 * time.Second
-	_, err = issuer.IssueToken("", nil, nil, &ttl, nil)
-
-	assert.ErrorIs(t, err, ErrTokenIssuanceFail)
-}
-
-func TestIssueToken_withAsymmKey_withInvalidTtl_shouldReturnError(t *testing.T) {
-	issuer, err := NewAsymmIssuer(issuerName, privateKey)
-	require.NoError(t, err)
-	require.NotNil(t, issuer)
-
-	ttl := -1 * time.Second
-	_, err = issuer.IssueToken("", nil, nil, &ttl, nil)
-
-	assert.ErrorIs(t, err, ErrTokenIssuanceFail)
-}
-
 func TestIssueToken_withoutKey_shouldBeParsableWithUnsecuredVerifier(t *testing.T) {
 	issuer, err := NewUnsignedIssuer(issuerName)
 	require.NoError(t, err)
@@ -102,7 +69,7 @@ func TestIssueToken_withoutKey_shouldBeParsableWithUnsecuredVerifier(t *testing.
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
-	token, err := issuer.IssueToken("", nil, nil, nil, nil)
+	token, err := issuer.IssueToken("", nil, nil, 0, time.Time{})
 	require.NoError(t, err)
 	require.NotNil(t, token)
 
@@ -123,7 +90,7 @@ func TestIssueToken_withSymmKey_shouldBeParsableWithSymmVerifier(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
-	token, err := issuer.IssueToken("", nil, nil, nil, nil)
+	token, err := issuer.IssueToken("", nil, nil, 0, time.Time{})
 	require.NoError(t, err)
 	require.NotNil(t, token)
 
@@ -144,7 +111,7 @@ func TestIssueToken_withAsymmKey_shouldBeParsableWithAsymmVerifier(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 
-	token, err := issuer.IssueToken("", nil, nil, nil, nil)
+	token, err := issuer.IssueToken("", nil, nil, 0, time.Time{})
 	require.NoError(t, err)
 	require.NotNil(t, token)
 
