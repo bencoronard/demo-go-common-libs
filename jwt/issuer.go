@@ -33,8 +33,8 @@ func NewUnsignedIssuer(iss string) (Issuer, error) {
 }
 
 func NewSymmIssuer(iss string, key []byte) (Issuer, error) {
-	if key == nil {
-		return nil, fmt.Errorf("%w: key must not be nil", ErrConstructInstanceFail)
+	if len(key) == 0 {
+		return nil, fmt.Errorf("%w: key must not be empty", ErrConstructInstanceFail)
 	}
 	return &symmIssuer{iss: iss, key: key}, nil
 }
