@@ -89,8 +89,7 @@ func (c *client) runTokenRenewalLoop(ctx context.Context) {
 				return
 			}
 			// Re-authentication
-			_, err := c.login(ctx)
-			if err != nil {
+			if _, err := c.login(ctx); err != nil {
 				continue
 			}
 		}
@@ -142,8 +141,7 @@ func newClient(lc fx.Lifecycle, addr string, auth vault.AuthMethod) (Client, err
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			_, err := c.login(ctx)
-			if err != nil {
+			if _, err := c.login(ctx); err != nil {
 				return err
 			}
 			return nil
@@ -194,8 +192,7 @@ func NewTokenClient(lc fx.Lifecycle, addr, token string) (Client, error) {
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			_, err := vc.Auth().Token().LookupSelfWithContext(ctx)
-			if err != nil {
+			if _, err := vc.Auth().Token().LookupSelfWithContext(ctx); err != nil {
 				return err
 			}
 			return nil
