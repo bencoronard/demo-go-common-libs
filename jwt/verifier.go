@@ -11,69 +11,69 @@ type Verifier interface {
 	VerifyToken(tokenStr string) (jwt.MapClaims, error)
 }
 
-type unsignedVerifier struct {
-	kf jwt.Keyfunc
-}
+type unsignedVerifier struct{}
 
 type symmVerifier struct {
-	kf jwt.Keyfunc
+	key []byte
 }
 
 type asymmVerifier struct {
-	kf jwt.Keyfunc
+	key *rsa.PublicKey
 }
 
 func NewUnsignedVerifier() (Verifier, error) {
-	return &unsignedVerifier{kf: func(t *jwt.Token) (any, error) {
-		if t.Method != jwt.SigningMethodNone {
-			return nil, fmt.Errorf("%w: expected none, got %T", ErrTokenVerificationFail, t.Method)
-		}
-		return jwt.UnsafeAllowNoneSignatureType, nil
-	}}, nil
+	return &unsignedVerifier{}, nil
 }
 
 func NewSymmVerifier(key []byte) (Verifier, error) {
-	if key == nil {
-		return nil, fmt.Errorf("%w: key must not be nil", ErrConstructInstanceFail)
+	if len(key) == 0 {
+		return nil, fmt.Errorf("%w: key must not be empty", ErrConstructInstanceFail)
 	}
 
-	return &symmVerifier{kf: func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("%w: expected HMAC, got %T", ErrTokenVerificationFail, t.Method)
-		}
-		return key, nil
-	}}, nil
+	keyCopy := make([]byte, len(key))
+	copy(keyCopy, key)
+
+	return &symmVerifier{key: keyCopy}, nil
 }
 
 func NewAsymmVerifier(key *rsa.PublicKey) (Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("%w: public key must not be nil", ErrConstructInstanceFail)
 	}
-	return &asymmVerifier{kf: func(t *jwt.Token) (any, error) {
+	return &asymmVerifier{key: key}, nil
+}
+
+func (v *unsignedVerifier) VerifyToken(token string) (jwt.MapClaims, error) {
+	return verifyToken(token, func(t *jwt.Token) (any, error) {
+		if t.Method != jwt.SigningMethodNone {
+			return nil, fmt.Errorf("%w: expected none, got %T", ErrTokenVerificationFail, t.Method)
+		}
+		return jwt.UnsafeAllowNoneSignatureType, nil
+	})
+}
+
+func (v *symmVerifier) VerifyToken(token string) (jwt.MapClaims, error) {
+	return verifyToken(token, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("%w: expected HMAC, got %T", ErrTokenVerificationFail, t.Method)
+		}
+		return v.key, nil
+	})
+}
+
+func (v *asymmVerifier) VerifyToken(token string) (jwt.MapClaims, error) {
+	return verifyToken(token, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("%w: expected RSA, got %T", ErrTokenVerificationFail, t.Method)
 		}
-		return key, nil
-	}}, nil
+		return v.key, nil
+	})
 }
 
-func (v *unsignedVerifier) VerifyToken(tokenStr string) (jwt.MapClaims, error) {
-	return verifyToken(tokenStr, v.kf)
-}
-
-func (v *symmVerifier) VerifyToken(tokenStr string) (jwt.MapClaims, error) {
-	return verifyToken(tokenStr, v.kf)
-}
-
-func (v *asymmVerifier) VerifyToken(tokenStr string) (jwt.MapClaims, error) {
-	return verifyToken(tokenStr, v.kf)
-}
-
-func verifyToken(tokenStr string, kf jwt.Keyfunc) (jwt.MapClaims, error) {
+func verifyToken(token string, kf jwt.Keyfunc) (jwt.MapClaims, error) {
 	claims := jwt.MapClaims{}
 
-	_, err := jwt.ParseWithClaims(tokenStr, claims, kf)
-	if err != nil {
+	if _, err := jwt.ParseWithClaims(token, claims, kf); err != nil {
 		return nil, fmt.Errorf("%w: parsing claims failed: %v", ErrTokenClaimsInvalid, err)
 	}
 
