@@ -1,4 +1,4 @@
-package rfc9457
+package dto
 
 import (
 	"encoding/json"
