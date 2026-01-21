@@ -2,6 +2,7 @@ package dto
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
 )
 
@@ -14,41 +15,47 @@ type ProblemDetail struct {
 	Properties map[string]any `json:"-"`
 }
 
-func (p *ProblemDetail) SetType(t string) *ProblemDetail {
+func (p ProblemDetail) WithType(t string) ProblemDetail {
 	p.Type = t
 	return p
 }
 
-func (p *ProblemDetail) SetTitle(title string) *ProblemDetail {
+func (p ProblemDetail) WithTitle(title string) ProblemDetail {
 	p.Title = title
 	return p
 }
 
-func (p *ProblemDetail) SetStatus(status int) *ProblemDetail {
+func (p ProblemDetail) WithStatus(status int) ProblemDetail {
 	p.Status = status
 	return p
 }
 
-func (p *ProblemDetail) SetDetail(detail string) *ProblemDetail {
+func (p ProblemDetail) WithDetail(detail string) ProblemDetail {
 	p.Detail = detail
 	return p
 }
 
-func (p *ProblemDetail) SetInstance(intance string) *ProblemDetail {
+func (p ProblemDetail) WithInstance(intance string) ProblemDetail {
 	p.Instance = intance
 	return p
 }
 
-func (p *ProblemDetail) SetProperty(key string, value any) *ProblemDetail {
+func (p ProblemDetail) WithProperty(key string, value any) ProblemDetail {
 	if p.Properties == nil {
-		p.Properties = make(map[string]any)
+		p.Properties = make(map[string]any, 1)
+	} else {
+		newProps := make(map[string]any, len(p.Properties)+1)
+		maps.Copy(newProps, p.Properties)
+		p.Properties = newProps
 	}
+
 	p.Properties[key] = value
+
 	return p
 }
 
-func ForStatusAndDetail(status int, detail string) *ProblemDetail {
-	return &ProblemDetail{
+func ForStatusAndDetail(status int, detail string) ProblemDetail {
+	return ProblemDetail{
 		Type:   "about:blank",
 		Title:  http.StatusText(status),
 		Status: status,
@@ -59,14 +66,18 @@ func ForStatusAndDetail(status int, detail string) *ProblemDetail {
 func (p ProblemDetail) MarshalJSON() ([]byte, error) {
 	type Alias ProblemDetail
 
-	base := make(map[string]any)
+	if len(p.Properties) == 0 {
+		return json.Marshal(Alias(p))
+	}
 
-	b, err := json.Marshal(Alias(p))
+	base := make(map[string]any, 5+len(p.Properties))
+
+	baseBytes, err := json.Marshal(Alias(p))
 	if err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(b, &base); err != nil {
+	if err := json.Unmarshal(baseBytes, &base); err != nil {
 		return nil, err
 	}
 
@@ -94,16 +105,17 @@ func (p *ProblemDetail) UnmarshalJSON(data []byte) error {
 
 	*p = ProblemDetail(known)
 
-	if p.Properties == nil {
-		p.Properties = make(map[string]any)
-	}
-
+	customProps := make(map[string]any)
 	for k, v := range raw {
 		switch k {
 		case "type", "title", "status", "detail", "instance":
 		default:
-			p.Properties[k] = v
+			customProps[k] = v
 		}
+	}
+
+	if len(customProps) > 0 {
+		p.Properties = customProps
 	}
 
 	return nil
