@@ -72,7 +72,25 @@ func (i *asymmIssuer) IssueToken(sub string, aud []string, claims map[string]any
 
 func buildClaims(iss string, sub string, aud []string, claims map[string]any, ttl time.Duration, nbf time.Time) (jwt.MapClaims, error) {
 	now := time.Now()
+
+	rand, err := uuid.NewRandom()
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to generate token UUID: %v", ErrTokenIssuanceFail, err)
+	}
+
 	mc := jwt.MapClaims{}
+
+	mc["iss"] = iss
+	mc["jti"] = rand.String()
+	mc["iat"] = jwt.NewNumericDate(now)
+
+	if sub != "" {
+		mc["sub"] = sub
+	}
+
+	if len(aud) > 0 {
+		mc["aud"] = aud
+	}
 
 	if !nbf.IsZero() {
 		mc["nbf"] = jwt.NewNumericDate(nbf)
@@ -82,19 +100,6 @@ func buildClaims(iss string, sub string, aud []string, claims map[string]any, tt
 		mc["exp"] = jwt.NewNumericDate(now.Add(ttl))
 	}
 
-	rand, err := uuid.NewRandom()
-	if err != nil {
-		return nil, fmt.Errorf("%w: failed to generate token UUID: %v", ErrTokenIssuanceFail, err)
-	}
-
-	if sub != "" {
-		mc["sub"] = sub
-	}
-
-	mc["iss"] = iss
-	mc["jti"] = rand.String()
-	mc["iat"] = jwt.NewNumericDate(now)
-	mc["aud"] = aud
 	maps.Copy(mc, claims)
 
 	return mc, nil
