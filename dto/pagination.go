@@ -75,6 +75,10 @@ func NewSlice[T any](content []T, pageable Pageable, totalFetched int) Slice[T] 
 	hasNext := totalFetched > pageable.Size
 
 	actualContent := content
+	if actualContent == nil {
+		actualContent = []T{}
+	}
+
 	if hasNext && len(content) > pageable.Size {
 		actualContent = content[:pageable.Size]
 	}
@@ -146,8 +150,11 @@ type Page[T any] struct {
 }
 
 func NewPage[T any](content []T, pageable Pageable, totalElements int) Page[T] {
-	totalPages := 0
+	if content == nil {
+		content = []T{}
+	}
 
+	totalPages := 0
 	if pageable.Size > 0 {
 		totalPages = int(math.Ceil(float64(totalElements) / float64(pageable.Size)))
 	}
