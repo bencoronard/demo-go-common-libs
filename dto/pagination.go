@@ -32,20 +32,12 @@ func NewPageable(page, size int) Pageable {
 	return Pageable{
 		Page: page,
 		Size: size,
-		Sort: nil,
+		Sort: []Sort{},
 	}
 }
 
 func (p Pageable) WithSort(prop string, dir Direction) Pageable {
-	var newSort []Sort
-	if len(p.Sort) == 0 {
-		newSort = []Sort{{Property: prop, Direction: dir}}
-	} else {
-		newSort = make([]Sort, len(p.Sort)+1)
-		copy(newSort, p.Sort)
-		newSort[len(p.Sort)] = Sort{Property: prop, Direction: dir}
-	}
-
+	newSort := append(p.Sort, Sort{Property: prop, Direction: dir})
 	return Pageable{
 		Page: p.Page,
 		Size: p.Size,
