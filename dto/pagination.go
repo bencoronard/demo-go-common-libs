@@ -109,21 +109,13 @@ func (s Slice[T]) PreviousPageable() (Pageable, bool) {
 }
 
 func Map[T any, U any](s Slice[T], fn func(T) U) Slice[U] {
-	if len(s.Content) == 0 {
-		return Slice[U]{
-			Content:          nil,
-			Pageable:         s.Pageable,
-			NumberOfElements: 0,
-			HasNext:          s.HasNext,
-			HasPrev:          s.HasPrev,
-			IsFirst:          s.IsFirst,
-			IsLast:           s.IsLast,
-		}
-	}
+	mapped := []U{}
 
-	mapped := make([]U, len(s.Content))
-	for i, item := range s.Content {
-		mapped[i] = fn(item)
+	if len(s.Content) > 0 {
+		mapped = make([]U, len(s.Content))
+		for i, item := range s.Content {
+			mapped[i] = fn(item)
+		}
 	}
 
 	return Slice[U]{
@@ -187,23 +179,13 @@ func (p Page[T]) PreviousPageable() (Pageable, bool) {
 }
 
 func MapPage[T any, U any](p Page[T], fn func(T) U) Page[U] {
-	if len(p.Content) == 0 {
-		return Page[U]{
-			Content:          nil,
-			Pageable:         p.Pageable,
-			NumberOfElements: 0,
-			HasNext:          p.HasNext,
-			HasPrev:          p.HasPrev,
-			IsFirst:          p.IsFirst,
-			IsLast:           p.IsLast,
-			TotalElements:    p.TotalElements,
-			TotalPages:       p.TotalPages,
-		}
-	}
+	mapped := []U{}
 
-	mapped := make([]U, len(p.Content))
-	for i, item := range p.Content {
-		mapped[i] = fn(item)
+	if len(p.Content) > 0 {
+		mapped = make([]U, len(p.Content))
+		for i, item := range p.Content {
+			mapped[i] = fn(item)
+		}
 	}
 
 	return Page[U]{
