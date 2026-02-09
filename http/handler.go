@@ -1,28 +1,46 @@
 package http
 
-import "github.com/labstack/echo/v5"
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+
+	"github.com/bencoronard/demo-go-common-libs/constant"
+	"github.com/bencoronard/demo-go-common-libs/dto"
+	"github.com/labstack/echo/v5"
+)
 
 type ErrorHandlerFunc func(c *echo.Context, err error) error
 
 func GlobalErrorHandler(fn ErrorHandlerFunc) func(c *echo.Context, err error) {
 	return func(c *echo.Context, err error) {
-		if resp, uErr := echo.UnwrapResponse(c.Response()); uErr == nil {
-			if resp.Committed {
-				return
-			}
+
+		if resp, err := echo.UnwrapResponse(c.Response()); err == nil && resp.Committed {
+			return
 		}
 
-		if fn != nil {
-			if err = fn(c, err); err != nil {
-				c.JSON(500, "Internal server error")
-				return
-			}
+		if fn != nil && fn(c, err) == nil {
+			return
 		}
 
-		handleError(c, err)
+		handleUncaughtError(c, err)
 	}
 }
 
-func handleError(c *echo.Context, err error) {
-	c.JSON(500, "Internal server error")
+func handleUncaughtError(c *echo.Context, err error) {
+	pd := dto.ForStatusAndDetail(http.StatusInternalServerError, "Unhandled error at server side")
+
+	switch {
+	case errors.Is(err, constant.ErrInsufficientPermission):
+		pd.Status = http.StatusForbidden
+		pd.Detail = err.Error()
+	case errors.Is(err, ErrMissingRequestHeader):
+		pd.Status = http.StatusBadRequest
+		pd.Detail = err.Error()
+
+	default:
+		slog.Error(err.Error())
+	}
+
+	c.JSON(pd.Status, pd)
 }
