@@ -20,7 +20,9 @@ func GlobalErrorHandler(fn CustomErrorHandlerFunc) echo.HTTPErrorHandler {
 			return
 		}
 
-		pd := dto.ForStatusAndDetail(http.StatusInternalServerError, "Unhandled error at server side").WithProperty("timestamp", time.Now()).WithProperty("trace", "demo-999")
+		pd := dto.ForStatusAndDetail(http.StatusInternalServerError, "Unhandled error at server side")
+		pd = pd.WithProperty("timestamp", time.Now())
+		pd = pd.WithProperty("trace", "demo-999")
 
 		handled := false
 
@@ -44,7 +46,9 @@ func handleUnhandledError(err error, pd *dto.ProblemDetail) {
 	case errors.Is(err, ErrMissingRequestHeader):
 		pd.Status = http.StatusBadRequest
 		pd.Detail = err.Error()
-	case errors.Is(err, jwt.ErrTokenVerificationFail), errors.Is(err, jwt.ErrTokenClaimsInvalid), errors.Is(err, jwt.ErrTokenMalformed):
+	case errors.Is(err, jwt.ErrTokenVerificationFail),
+		errors.Is(err, jwt.ErrTokenClaimsInvalid),
+		errors.Is(err, jwt.ErrTokenMalformed):
 		pd.Status = http.StatusUnauthorized
 		pd.Detail = err.Error()
 	default:
