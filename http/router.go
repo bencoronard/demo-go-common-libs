@@ -2,8 +2,8 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 
@@ -11,41 +11,36 @@ import (
 )
 
 type Router interface {
-	ListeningPort() int
-	Listen(port int) (net.Listener, error)
-	Serve(l net.Listener) error
-	Shutdown(ctx context.Context) error
+	Port() int
+	Handler() http.Handler
 	RegisterMiddlewares()
 	RegisterRoutes()
 }
 
 func Start(lc fx.Lifecycle, sd fx.Shutdowner, r Router) {
+	s := http.Server{
+		Addr:    fmt.Sprintf(":%d", r.Port()),
+		Handler: r.Handler(),
+	}
+
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			ln, err := r.Listen(r.ListeningPort())
-			if err != nil {
-				return err
-			}
-
 			slog.Info(
-				"HTTP server listening",
+				"HTTP server starting...",
 				"pid", os.Getpid(),
-				"port", r.ListeningPort(),
+				"port", r.Port(),
 			)
-
 			go func() {
-				if err := r.Serve(ln); err != nil && err != http.ErrServerClosed {
-					slog.Error("HTTP server failed", "error", err)
+				if err := s.ListenAndServe(); err != http.ErrServerClosed {
+					slog.Error("Failed to start HTTP server", "error", err)
 					sd.Shutdown()
 				}
 			}()
-
 			return nil
 		},
-
 		OnStop: func(ctx context.Context) error {
 			slog.Info("HTTP server shutting down...")
-			return r.Shutdown(ctx)
+			return s.Shutdown(ctx)
 		},
 	})
 }
