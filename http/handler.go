@@ -2,7 +2,6 @@ package http
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -24,11 +23,12 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 		status := http.StatusInternalServerError
 		msg := "Unhandled error at server side"
 
-		// Log error struct
-		slog.Warn("unhandled error",
-			slog.String("type", fmt.Sprintf("%T", err)),
-			slog.Any("error", err),
-		)
+		var sc echo.HTTPStatusCoder
+		if errors.As(err, &sc) {
+			if tmp := sc.StatusCode(); tmp != 0 {
+				status = tmp
+			}
+		}
 
 		if he, ok := errors.AsType[*echo.HTTPError](err); ok {
 			status = he.Code
