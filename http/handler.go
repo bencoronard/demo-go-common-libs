@@ -21,7 +21,7 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 		}
 
 		status := http.StatusInternalServerError
-		msg := "Unhandled error at server side"
+		msg := "Unhandled error at server side!"
 
 		if he, ok := errors.AsType[*echo.HTTPError](err); ok {
 			status = he.Code
