@@ -31,11 +31,6 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 			}
 		}
 
-		if he, ok := errors.AsType[*echo.HTTPError](err); ok {
-			status = he.Code
-			detail = he.Message
-		}
-
 		pd := dto.ForStatusAndDetail(status, detail)
 		pd = pd.WithProperty("timestamp", time.Now())
 		pd = pd.WithProperty("trace", "demo-999")
