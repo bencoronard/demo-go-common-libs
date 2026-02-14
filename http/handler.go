@@ -21,21 +21,22 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 		}
 
 		status := http.StatusInternalServerError
-		msg := "Unhandled error at server side"
+		detail := "Unhandled error at server side"
 
 		var sc echo.HTTPStatusCoder
 		if errors.As(err, &sc) {
 			if tmp := sc.StatusCode(); tmp != 0 {
 				status = tmp
+				detail = err.Error()
 			}
 		}
 
 		if he, ok := errors.AsType[*echo.HTTPError](err); ok {
 			status = he.Code
-			msg = he.Message
+			detail = he.Message
 		}
 
-		pd := dto.ForStatusAndDetail(status, msg)
+		pd := dto.ForStatusAndDetail(status, detail)
 		pd = pd.WithProperty("timestamp", time.Now())
 		pd = pd.WithProperty("trace", "demo-999")
 
