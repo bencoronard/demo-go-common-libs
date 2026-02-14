@@ -12,9 +12,9 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-type CustomErrorHandlerFunc func(err error, pd *dto.ProblemDetail) error
+type AppErrorHandlerFunc func(err error, pd *dto.ProblemDetail) error
 
-func GlobalErrorHandler(fn CustomErrorHandlerFunc) echo.HTTPErrorHandler {
+func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 	return func(c *echo.Context, err error) {
 		if resp, err := echo.UnwrapResponse(c.Response()); err == nil && resp.Committed {
 			return
