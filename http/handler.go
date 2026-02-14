@@ -20,7 +20,15 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 			return
 		}
 
-		pd := dto.ForStatusAndDetail(http.StatusInternalServerError, "Unhandled error at server side")
+		status := http.StatusInternalServerError
+		msg := "Unhandled error at server side"
+
+		if he, ok := errors.AsType[*echo.HTTPError](err); ok {
+			status = he.Code
+			msg = he.Message
+		}
+
+		pd := dto.ForStatusAndDetail(status, msg)
 		pd = pd.WithProperty("timestamp", time.Now())
 		pd = pd.WithProperty("trace", "demo-999")
 
