@@ -1,9 +1,8 @@
 package dto
 
 import (
+	"bytes"
 	"encoding/json"
-	"maps"
-	"net/http"
 )
 
 type ProblemDetail struct {
@@ -15,107 +14,75 @@ type ProblemDetail struct {
 	Properties map[string]any `json:"-"`
 }
 
-func (p ProblemDetail) WithType(t string) ProblemDetail {
-	p.Type = t
-	return p
-}
-
-func (p ProblemDetail) WithTitle(title string) ProblemDetail {
-	p.Title = title
-	return p
-}
-
-func (p ProblemDetail) WithStatus(status int) ProblemDetail {
-	p.Status = status
-	return p
-}
-
-func (p ProblemDetail) WithDetail(detail string) ProblemDetail {
-	p.Detail = detail
-	return p
-}
-
-func (p ProblemDetail) WithInstance(intance string) ProblemDetail {
-	p.Instance = intance
-	return p
-}
-
-func (p ProblemDetail) WithProperty(key string, value any) ProblemDetail {
-	if p.Properties == nil {
-		p.Properties = make(map[string]any, 1)
-	} else {
-		newProps := make(map[string]any, len(p.Properties)+1)
-		maps.Copy(newProps, p.Properties)
-		p.Properties = newProps
-	}
-
-	p.Properties[key] = value
-
-	return p
-}
-
-func ForStatusAndDetail(status int, detail string) ProblemDetail {
-	return ProblemDetail{
-		Type:   "about:blank",
-		Title:  http.StatusText(status),
-		Status: status,
-		Detail: detail,
-	}
-}
-
-func (p ProblemDetail) MarshalJSON() ([]byte, error) {
+func (p *ProblemDetail) MarshalJSON() ([]byte, error) {
 	type Alias ProblemDetail
+	alias := (*Alias)(p)
 
 	if len(p.Properties) == 0 {
-		return json.Marshal(Alias(p))
+		return json.Marshal(alias)
 	}
 
-	base := make(map[string]any, 5+len(p.Properties))
-
-	baseBytes, err := json.Marshal(Alias(p))
+	baseBytes, err := json.Marshal(alias)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(baseBytes, &base); err != nil {
-		return nil, err
-	}
+	baseBytes = baseBytes[:len(baseBytes)-1]
+
+	var buf bytes.Buffer
+	buf.Grow(len(baseBytes) + 64)
+	buf.Write(baseBytes)
 
 	for k, v := range p.Properties {
-		if _, exists := base[k]; !exists {
-			base[k] = v
+		buf.WriteByte(',')
+
+		keyBytes, err := json.Marshal(k)
+		if err != nil {
+			return nil, err
 		}
+		valBytes, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+
+		buf.Write(keyBytes)
+		buf.WriteByte(':')
+		buf.Write(valBytes)
 	}
 
-	return json.Marshal(base)
+	buf.WriteByte('}')
+
+	return buf.Bytes(), nil
 }
 
 func (p *ProblemDetail) UnmarshalJSON(data []byte) error {
 	type Alias ProblemDetail
 
-	var raw map[string]any
+	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
-	var known Alias
-	if err := json.Unmarshal(data, &known); err != nil {
+	var alias Alias
+	if err := json.Unmarshal(data, &alias); err != nil {
 		return err
 	}
 
-	*p = ProblemDetail(known)
+	*p = ProblemDetail(alias)
 
-	customProps := make(map[string]any)
-	for k, v := range raw {
-		switch k {
-		case "type", "title", "status", "detail", "instance":
-		default:
-			customProps[k] = v
-		}
+	for _, field := range []string{"type", "title", "status", "detail", "instance"} {
+		delete(raw, field)
 	}
 
-	if len(customProps) > 0 {
-		p.Properties = customProps
+	if len(raw) > 0 {
+		p.Properties = make(map[string]any, len(raw))
+		for k, v := range raw {
+			var decoded any
+			if err := json.Unmarshal(v, &decoded); err != nil {
+				return err
+			}
+			p.Properties[k] = decoded
+		}
 	}
 
 	return nil

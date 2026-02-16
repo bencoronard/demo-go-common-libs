@@ -31,18 +31,26 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 			}
 		}
 
-		pd := dto.ForStatusAndDetail(status, detail)
-		pd = pd.WithProperty("timestamp", time.Now())
-		pd = pd.WithProperty("trace", "demo-999")
+		pd := dto.ProblemDetail{
+			Type:   "about:blank",
+			Status: status,
+			Detail: detail,
+			Properties: map[string]any{
+				"timestamp": time.Now(),
+				"trace":     "",
+			},
+		}
 
 		handled := false
-
 		if fn != nil {
 			handled = fn(err, &pd) == nil
 		}
-
 		if !handled {
 			handleUnhandledError(err, &pd)
+		}
+
+		if pd.Title == "" {
+			pd.Title = http.StatusText(pd.Status)
 		}
 
 		c.JSON(pd.Status, pd)
