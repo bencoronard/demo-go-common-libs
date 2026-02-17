@@ -22,12 +22,14 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 
 		status := http.StatusInternalServerError
 		detail := "Unhandled error at server side"
+		handled := false
 
 		var sc echo.HTTPStatusCoder
 		if errors.As(err, &sc) {
 			if tmp := sc.StatusCode(); tmp != 0 {
 				status = tmp
 				detail = err.Error()
+				handled = true
 			}
 		}
 
@@ -41,7 +43,6 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 			},
 		}
 
-		handled := false
 		if fn != nil {
 			handled = fn(err, &pd) == nil
 		}
