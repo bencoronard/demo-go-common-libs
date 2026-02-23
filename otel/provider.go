@@ -2,6 +2,7 @@ package otel
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
@@ -12,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
-func NewTracerProvider(ctx context.Context, endpoint string, batchTimeoutInSec int) (*trace.TracerProvider, error) {
+func NewTracerProvider(ctx context.Context, endpoint string, batchTimeoutInSec int, samplingRatio float64) (*trace.TracerProvider, error) {
 	exporter, err := otlptracegrpc.New(
 		ctx,
 		otlptracegrpc.WithEndpoint(endpoint),
@@ -22,7 +23,14 @@ func NewTracerProvider(ctx context.Context, endpoint string, batchTimeoutInSec i
 		return nil, err
 	}
 
+	if samplingRatio < 0.0 || samplingRatio > 1.0 {
+		return nil, fmt.Errorf("%w: trace sampling ratio must be between 0.0 and 1.0", ErrConstructProvider)
+	}
+
+	sampler := trace.ParentBased(trace.TraceIDRatioBased(samplingRatio))
+
 	provider := trace.NewTracerProvider(
+		trace.WithSampler(sampler),
 		trace.WithBatcher(
 			exporter,
 			trace.WithBatchTimeout(time.Duration(batchTimeoutInSec)*time.Second)),
