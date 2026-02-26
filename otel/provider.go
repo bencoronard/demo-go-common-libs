@@ -10,10 +10,11 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
-func NewTracerProvider(ctx context.Context, endpoint string, batchTimeoutInSec int, samplingRatio float64) (*trace.TracerProvider, error) {
+func NewTracerProvider(ctx context.Context, res *resource.Resource, endpoint string, batchTimeoutInSec int, samplingRatio float64) (*trace.TracerProvider, error) {
 	exporter, err := otlptracegrpc.New(
 		ctx,
 		otlptracegrpc.WithEndpoint(endpoint),
@@ -30,6 +31,7 @@ func NewTracerProvider(ctx context.Context, endpoint string, batchTimeoutInSec i
 	sampler := trace.ParentBased(trace.TraceIDRatioBased(samplingRatio))
 
 	provider := trace.NewTracerProvider(
+		trace.WithResource(res),
 		trace.WithSampler(sampler),
 		trace.WithBatcher(
 			exporter,
@@ -39,7 +41,7 @@ func NewTracerProvider(ctx context.Context, endpoint string, batchTimeoutInSec i
 	return provider, nil
 }
 
-func NewMeterProvider(ctx context.Context, endpoint string, samplingIntervalInSec int) (*metric.MeterProvider, error) {
+func NewMeterProvider(ctx context.Context, res *resource.Resource, endpoint string, samplingIntervalInSec int) (*metric.MeterProvider, error) {
 	exporter, err := otlpmetricgrpc.New(
 		ctx,
 		otlpmetricgrpc.WithEndpoint(endpoint),
@@ -50,6 +52,7 @@ func NewMeterProvider(ctx context.Context, endpoint string, samplingIntervalInSe
 	}
 
 	provider := metric.NewMeterProvider(
+		metric.WithResource(res),
 		metric.WithReader(metric.NewPeriodicReader(
 			exporter,
 			metric.WithInterval(time.Duration(samplingIntervalInSec)*time.Second),
@@ -59,7 +62,7 @@ func NewMeterProvider(ctx context.Context, endpoint string, samplingIntervalInSe
 	return provider, nil
 }
 
-func NewLoggerProvider(ctx context.Context, endpoint string, exportIntervalInSec int) (*log.LoggerProvider, error) {
+func NewLoggerProvider(ctx context.Context, res *resource.Resource, endpoint string, exportIntervalInSec int) (*log.LoggerProvider, error) {
 	exporter, err := otlploggrpc.New(
 		ctx,
 		otlploggrpc.WithEndpoint(endpoint),
@@ -70,6 +73,7 @@ func NewLoggerProvider(ctx context.Context, endpoint string, exportIntervalInSec
 	}
 
 	provider := log.NewLoggerProvider(
+		log.WithResource(res),
 		log.WithProcessor(
 			log.NewBatchProcessor(
 				exporter,
