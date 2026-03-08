@@ -12,8 +12,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
-func NewTracerProvider(ctx context.Context, res *resource.Resource) (*trace.TracerProvider, error) {
-	exporter, err := otlptracegrpc.New(ctx)
+func NewTracerProvider(res *resource.Resource) (*trace.TracerProvider, error) {
+	exporter, err := otlptracegrpc.New(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func NewTracerProvider(ctx context.Context, res *resource.Resource) (*trace.Trac
 }
 
 func NewMeterProvider(ctx context.Context, res *resource.Resource) (*metric.MeterProvider, error) {
-	exporter, err := otlpmetricgrpc.New(ctx)
+	exporter, err := otlpmetricgrpc.New(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func NewMeterProvider(ctx context.Context, res *resource.Resource) (*metric.Mete
 }
 
 func NewLoggerProvider(ctx context.Context, res *resource.Resource) (*log.LoggerProvider, error) {
-	exporter, err := otlploggrpc.New(ctx)
+	exporter, err := otlploggrpc.New(context.Background())
 	if err != nil {
 		return nil, err
 	}
