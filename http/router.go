@@ -19,28 +19,28 @@ type Router interface {
 
 type RouterStartParams struct {
 	fx.In
-	lc fx.Lifecycle
-	sd fx.Shutdowner
-	r  Router
+	Lifecycle  fx.Lifecycle
+	Shutdowner fx.Shutdowner
+	Router     Router
 }
 
 func Start(p RouterStartParams) {
 	s := http.Server{
-		Addr:    fmt.Sprintf(":%d", p.r.Port()),
-		Handler: p.r.Handler(),
+		Addr:    fmt.Sprintf(":%d", p.Router.Port()),
+		Handler: p.Router.Handler(),
 	}
 
-	p.lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			slog.Info(
 				"HTTP server starting...",
 				"pid", os.Getpid(),
-				"port", p.r.Port(),
+				"port", p.Router.Port(),
 			)
 			go func() {
 				if err := s.ListenAndServe(); err != http.ErrServerClosed {
 					slog.Error("Failed to start HTTP server", "error", err)
-					p.sd.Shutdown()
+					p.Shutdowner.Shutdown()
 				}
 			}()
 			return nil
