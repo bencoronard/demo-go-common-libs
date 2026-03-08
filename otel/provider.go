@@ -26,7 +26,7 @@ func NewTracerProvider(res *resource.Resource) (*trace.TracerProvider, error) {
 	return provider, nil
 }
 
-func NewMeterProvider(ctx context.Context, res *resource.Resource) (*metric.MeterProvider, error) {
+func NewMeterProvider(res *resource.Resource) (*metric.MeterProvider, error) {
 	exporter, err := otlpmetricgrpc.New(context.Background())
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func NewMeterProvider(ctx context.Context, res *resource.Resource) (*metric.Mete
 	return provider, nil
 }
 
-func NewLoggerProvider(ctx context.Context, res *resource.Resource) (*log.LoggerProvider, error) {
+func NewLoggerProvider(res *resource.Resource) (*log.LoggerProvider, error) {
 	exporter, err := otlploggrpc.New(context.Background())
 	if err != nil {
 		return nil, err
