@@ -1,6 +1,9 @@
 package utility
 
 import (
+	"reflect"
+	"strings"
+
 	val "github.com/go-playground/validator/v10"
 )
 
@@ -13,8 +16,12 @@ type validator struct {
 }
 
 func NewValidator() (Validator, error) {
+	v := val.New(val.WithRequiredStructEnabled())
+
+	v.RegisterValidation("notblank", notblank)
+
 	return &validator{
-		validator: val.New(val.WithRequiredStructEnabled()),
+		validator: v,
 	}, nil
 }
 
@@ -23,4 +30,14 @@ func (v *validator) Validate(i any) error {
 		return err
 	}
 	return nil
+}
+
+func notblank(fl val.FieldLevel) bool {
+	if fl.Field().Kind() == reflect.Pointer {
+		if fl.Field().IsNil() {
+			return false
+		}
+		return len(strings.TrimSpace(fl.Field().Elem().String())) > 0
+	}
+	return len(strings.TrimSpace(fl.Field().String())) > 0
 }
