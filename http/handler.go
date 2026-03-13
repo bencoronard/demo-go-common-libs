@@ -39,7 +39,6 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 			Detail: detail,
 			Properties: map[string]any{
 				"timestamp": time.Now(),
-				"trace":     "",
 			},
 		}
 
