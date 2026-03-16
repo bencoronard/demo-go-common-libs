@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bencoronard/demo-go-common-libs/constant"
+	"github.com/bencoronard/demo-go-common-libs/auth"
 	"github.com/bencoronard/demo-go-common-libs/dto"
 	"github.com/bencoronard/demo-go-common-libs/jwt"
+	"github.com/bencoronard/demo-go-common-libs/validation"
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 )
 
@@ -58,8 +60,23 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 }
 
 func handleUnhandledError(err error, pd *dto.ProblemDetail) {
+	var ve validator.ValidationErrors
 	switch {
-	case errors.Is(err, constant.ErrInsufficientPermission):
+	case errors.As(err, &ve):
+		var validationDetails []validation.FieldValidationError
+		for _, fe := range ve {
+			validationDetails = append(validationDetails, validation.FieldValidationError{
+				Field:   fe.Field(),
+				Message: fe.Error(),
+			})
+		}
+		if pd.Properties == nil {
+			pd.Properties = make(map[string]any)
+		}
+		pd.Status = http.StatusBadRequest
+		pd.Detail = err.Error()
+		pd.Properties["errors"] = validationDetails
+	case errors.Is(err, auth.ErrInsufficientPermission):
 		pd.Status = http.StatusForbidden
 		pd.Detail = err.Error()
 	case errors.Is(err, ErrMissingRequestHeader):
@@ -71,6 +88,6 @@ func handleUnhandledError(err error, pd *dto.ProblemDetail) {
 		pd.Status = http.StatusUnauthorized
 		pd.Detail = err.Error()
 	default:
-		slog.Error(err.Error())
+		slog.Error("unhandled error", "error", err)
 	}
 }
