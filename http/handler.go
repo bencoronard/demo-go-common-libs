@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,7 +13,8 @@ import (
 	"github.com/bencoronard/demo-go-common-libs/validation"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
-	"go.opentelemetry.io/otel/sdk/trace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 )
 
@@ -22,8 +24,8 @@ type AppErrorHandler interface {
 
 type GlobalErrorHandlerParams struct {
 	fx.In
-	AppErrHandler  AppErrorHandler       `optional:"true"`
-	TracerProvider *trace.TracerProvider `optional:"true"`
+	AppErrHandler  AppErrorHandler          `optional:"true"`
+	TracerProvider *sdktrace.TracerProvider `optional:"true"`
 }
 
 type GlobalErrorHandler interface {
@@ -32,7 +34,7 @@ type GlobalErrorHandler interface {
 
 type globalErrorHandlerImpl struct {
 	ah AppErrorHandler
-	tp *trace.TracerProvider
+	tp *sdktrace.TracerProvider
 }
 
 func NewGlobalErrorHandler(p GlobalErrorHandlerParams) GlobalErrorHandler {
@@ -40,6 +42,17 @@ func NewGlobalErrorHandler(p GlobalErrorHandlerParams) GlobalErrorHandler {
 		ah: p.AppErrHandler,
 		tp: p.TracerProvider,
 	}
+}
+
+func (h *globalErrorHandlerImpl) extractTraceID(ctx context.Context) string {
+	if h.tp == nil {
+		return ""
+	}
+	span := trace.SpanFromContext(ctx).SpanContext()
+	if span.IsValid() {
+		return span.TraceID().String()
+	}
+	return ""
 }
 
 func (h *globalErrorHandlerImpl) GetHandler() func(c *echo.Context, err error) {
@@ -67,6 +80,7 @@ func (h *globalErrorHandlerImpl) GetHandler() func(c *echo.Context, err error) {
 			Detail: detail,
 			Properties: map[string]any{
 				"timestamp": time.Now(),
+				"trace":     h.extractTraceID(c.Request().Context()),
 			},
 		}
 
