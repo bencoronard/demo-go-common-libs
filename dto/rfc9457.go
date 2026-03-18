@@ -34,6 +34,10 @@ func (p *ProblemDetail) MarshalJSON() ([]byte, error) {
 	buf.Write(baseBytes)
 
 	for k, v := range p.Properties {
+		if s, ok := v.(string); ok && s == "" {
+			continue
+		}
+
 		buf.WriteByte(',')
 
 		keyBytes, err := json.Marshal(k)
