@@ -12,11 +12,37 @@ import (
 	"github.com/bencoronard/demo-go-common-libs/validation"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"go.uber.org/fx"
 )
 
-type AppErrorHandlerFunc func(err error, pd *dto.ProblemDetail) error
+type AppErrorHandler interface {
+	Handle(err error, pd *dto.ProblemDetail) error
+}
 
-func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
+type GlobalErrorHandlerParams struct {
+	fx.In
+	AppErrHandler  AppErrorHandler       `optional:"true"`
+	TracerProvider *trace.TracerProvider `optional:"true"`
+}
+
+type GlobalErrorHandler interface {
+	GetHandler() func(c *echo.Context, err error)
+}
+
+type globalErrorHandlerImpl struct {
+	ah AppErrorHandler
+	tp *trace.TracerProvider
+}
+
+func NewGlobalErrorHandler(p GlobalErrorHandlerParams) GlobalErrorHandler {
+	return &globalErrorHandlerImpl{
+		ah: p.AppErrHandler,
+		tp: p.TracerProvider,
+	}
+}
+
+func (h *globalErrorHandlerImpl) GetHandler() func(c *echo.Context, err error) {
 	return func(c *echo.Context, err error) {
 		if resp, err := echo.UnwrapResponse(c.Response()); err == nil && resp.Committed {
 			return
@@ -44,8 +70,8 @@ func GlobalErrorHandler(fn AppErrorHandlerFunc) echo.HTTPErrorHandler {
 			},
 		}
 
-		if fn != nil {
-			handled = fn(err, &pd) == nil
+		if h.ah != nil {
+			handled = h.ah.Handle(err, &pd) == nil
 		}
 		if !handled {
 			handleUnhandledError(err, &pd)
