@@ -114,7 +114,7 @@ func handleUnhandledError(err error, pd *dto.ProblemDetail) {
 			pd.Properties = make(map[string]any)
 		}
 		pd.Status = http.StatusBadRequest
-		pd.Detail = err.Error()
+		pd.Detail = "Input data did not pass validations"
 		pd.Properties["errors"] = validationDetails
 	case errors.Is(err, auth.ErrInsufficientPermission):
 		pd.Status = http.StatusForbidden
