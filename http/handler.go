@@ -19,7 +19,7 @@ import (
 )
 
 type AppErrorHandler interface {
-	Handle(err error, pd *dto.ProblemDetail) error
+	Handle(err error, pd dto.ProblemDetail) (dto.ProblemDetail, bool)
 }
 
 type GlobalErrorHandlerParams struct {
@@ -74,32 +74,23 @@ func (h *globalErrorHandlerImpl) GetHandler() func(c *echo.Context, err error) {
 			}
 		}
 
-		pd := dto.ProblemDetail{
-			Type:   "about:blank",
-			Status: status,
-			Detail: detail,
-			Properties: map[string]any{
-				"timestamp": time.Now(),
-				"trace":     h.extractTraceID(c.Request().Context()),
-			},
-		}
+		pd := dto.NewProblemDetail(status).
+			WithDetail(detail).
+			With("timestamp", time.Now()).
+			With("trace", h.extractTraceID(c.Request().Context()))
 
 		if h.ah != nil {
-			handled = h.ah.Handle(err, &pd) == nil
+			pd, handled = h.ah.Handle(err, pd)
 		}
 		if !handled {
-			handleUnhandledError(err, &pd)
+			pd = handleUnhandledError(err, pd)
 		}
 
-		if pd.Title == "" {
-			pd.Title = http.StatusText(pd.Status)
-		}
-
-		c.JSON(pd.Status, pd)
+		c.JSON(pd.Status(), pd)
 	}
 }
 
-func handleUnhandledError(err error, pd *dto.ProblemDetail) {
+func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
 	var ve validator.ValidationErrors
 	switch {
 	case errors.As(err, &ve):
@@ -110,24 +101,26 @@ func handleUnhandledError(err error, pd *dto.ProblemDetail) {
 				Message: fe.Error(),
 			})
 		}
-		if pd.Properties == nil {
-			pd.Properties = make(map[string]any)
-		}
-		pd.Status = http.StatusBadRequest
-		pd.Detail = "Input data did not pass validations"
-		pd.Properties["errors"] = validationDetails
+		return pd.
+			WithStatus(http.StatusBadRequest).
+			WithDetail("Input data did not pass validations").
+			With("errors", validationDetails)
 	case errors.Is(err, auth.ErrInsufficientPermission):
-		pd.Status = http.StatusForbidden
-		pd.Detail = err.Error()
+		return pd.
+			WithStatus(http.StatusForbidden).
+			WithDetail(err.Error())
 	case errors.Is(err, ErrMissingRequestHeader):
-		pd.Status = http.StatusBadRequest
-		pd.Detail = err.Error()
+		return pd.
+			WithStatus(http.StatusBadRequest).
+			WithDetail(err.Error())
 	case errors.Is(err, jwt.ErrTokenVerificationFail),
 		errors.Is(err, jwt.ErrTokenClaimsInvalid),
 		errors.Is(err, jwt.ErrTokenMalformed):
-		pd.Status = http.StatusUnauthorized
-		pd.Detail = err.Error()
+		return pd.
+			WithStatus(http.StatusUnauthorized).
+			WithDetail(err.Error())
 	default:
 		slog.Error("unhandled error", "error", err)
+		return pd
 	}
 }

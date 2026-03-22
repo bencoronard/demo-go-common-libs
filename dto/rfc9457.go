@@ -1,93 +1,98 @@
 package dto
 
-import (
-	"bytes"
-	"encoding/json"
-)
+import "net/http"
 
-type ProblemDetail struct {
-	Type       string         `json:"type,omitempty"`
-	Title      string         `json:"title,omitempty"`
-	Status     int            `json:"status"`
-	Detail     string         `json:"detail,omitempty"`
-	Instance   string         `json:"instance,omitempty"`
-	Properties map[string]any `json:"-"`
+type ProblemDetail map[string]any
+
+func NewProblemDetail(status int) ProblemDetail {
+	return ProblemDetail{
+		"type":   "about:blank",
+		"status": status,
+		"title":  http.StatusText(status),
+	}
 }
 
-func (p *ProblemDetail) MarshalJSON() ([]byte, error) {
-	type Alias ProblemDetail
-	alias := (*Alias)(p)
-
-	if len(p.Properties) == 0 {
-		return json.Marshal(alias)
-	}
-
-	baseBytes, err := json.Marshal(alias)
-	if err != nil {
-		return nil, err
-	}
-
-	baseBytes = baseBytes[:len(baseBytes)-1]
-
-	var buf bytes.Buffer
-	buf.Grow(len(baseBytes) + 64)
-	buf.Write(baseBytes)
-
-	for k, v := range p.Properties {
-		if s, ok := v.(string); ok && s == "" {
-			continue
-		}
-
-		buf.WriteByte(',')
-
-		keyBytes, err := json.Marshal(k)
-		if err != nil {
-			return nil, err
-		}
-		valBytes, err := json.Marshal(v)
-		if err != nil {
-			return nil, err
-		}
-
-		buf.Write(keyBytes)
-		buf.WriteByte(':')
-		buf.Write(valBytes)
-	}
-
-	buf.WriteByte('}')
-
-	return buf.Bytes(), nil
+func (p ProblemDetail) WithStatus(s int) ProblemDetail {
+	p["status"] = s
+	return p
 }
 
-func (p *ProblemDetail) UnmarshalJSON(data []byte) error {
-	type Alias ProblemDetail
-
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
+func (p ProblemDetail) WithType(t string) ProblemDetail {
+	if t == "" {
+		return p
 	}
+	p["type"] = t
+	return p
+}
 
-	var alias Alias
-	if err := json.Unmarshal(data, &alias); err != nil {
-		return err
+func (p ProblemDetail) WithTitle(t string) ProblemDetail {
+	if t == "" {
+		return p
 	}
+	p["title"] = t
+	return p
+}
 
-	*p = ProblemDetail(alias)
-
-	for _, field := range []string{"type", "title", "status", "detail", "instance"} {
-		delete(raw, field)
+func (p ProblemDetail) WithDetail(d string) ProblemDetail {
+	if d == "" {
+		return p
 	}
+	p["detail"] = d
+	return p
+}
 
-	if len(raw) > 0 {
-		p.Properties = make(map[string]any, len(raw))
-		for k, v := range raw {
-			var decoded any
-			if err := json.Unmarshal(v, &decoded); err != nil {
-				return err
-			}
-			p.Properties[k] = decoded
-		}
+func (p ProblemDetail) WithInstance(i string) ProblemDetail {
+	if i == "" {
+		return p
 	}
+	p["instance"] = i
+	return p
+}
 
-	return nil
+func (p ProblemDetail) With(key string, value any) ProblemDetail {
+	if key == "" {
+		return p
+	}
+	if value == nil {
+		return p
+	}
+	if s, ok := value.(string); ok && s == "" {
+		return p
+	}
+	p[key] = value
+	return p
+}
+
+func (p ProblemDetail) Type() string {
+	return stringVal(p["type"])
+}
+
+func (p ProblemDetail) Title() string {
+	return stringVal(p["title"])
+}
+
+func (p ProblemDetail) Status() int {
+	if v, ok := p["status"].(int); ok {
+		return v
+	}
+	return 0
+}
+
+func (p ProblemDetail) Detail() string {
+	return stringVal(p["detail"])
+}
+
+func (p ProblemDetail) Instance() string {
+	return stringVal(p["instance"])
+}
+
+func (p ProblemDetail) Get(key string) any {
+	return p[key]
+}
+
+func stringVal(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
 }
