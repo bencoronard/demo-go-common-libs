@@ -86,6 +86,10 @@ func (h *globalErrorHandlerImpl) GetHandler() func(c *echo.Context, err error) {
 			pd = handleUnhandledError(err, pd)
 		}
 
+		if pd.Title() == "" {
+			pd = pd.WithTitle(http.StatusText(pd.Status()))
+		}
+
 		c.JSON(pd.Status(), pd)
 	}
 }
