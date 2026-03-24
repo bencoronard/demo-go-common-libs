@@ -70,7 +70,9 @@ func (a *actuatorImpl) monitor(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			err := a.check(ctx)
+			pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			err := a.check(pingCtx)
+			cancel()
 			a.ready.Store(err == nil)
 		case <-ctx.Done():
 			return
@@ -79,5 +81,8 @@ func (a *actuatorImpl) monitor(ctx context.Context) {
 }
 
 func (a *actuatorImpl) check(ctx context.Context) error {
-	return a.db.PingContext(ctx)
+	if a.db != nil {
+		return a.db.PingContext(ctx)
+	}
+	return nil
 }
