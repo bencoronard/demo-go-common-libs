@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
@@ -70,6 +71,22 @@ func (a *actuatorImpl) Readiness() bool {
 }
 
 func (a *actuatorImpl) monitor(ctx context.Context) {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			ready := a.checkResources(pingCtx)
+			cancel()
+			a.ready.Store(ready)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (a *actuatorImpl) checkResources(ctx context.Context) bool {
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(a.checks))
 
@@ -86,5 +103,5 @@ func (a *actuatorImpl) monitor(ctx context.Context) {
 	wg.Wait()
 	close(errCh)
 
-	a.ready.Store(len(errCh) == 0)
+	return len(errCh) == 0
 }
