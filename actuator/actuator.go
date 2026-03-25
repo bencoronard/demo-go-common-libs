@@ -2,13 +2,19 @@ package actuator
 
 import (
 	"context"
-	"database/sql"
+	"sync"
 	"sync/atomic"
-	"time"
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
 )
+
+type ResourceCheck func(ctx context.Context) error
+
+type Actuator interface {
+	Liveness() bool
+	Readiness() bool
+}
 
 type ActuatorParams struct {
 	fx.In
@@ -16,28 +22,27 @@ type ActuatorParams struct {
 	DB        *gorm.DB `optional:"true"`
 }
 
-type Actuator interface {
-	Liveness() bool
-	Readiness() bool
-}
-
 type actuatorImpl struct {
-	ready atomic.Bool
-	db    *sql.DB
+	ready  atomic.Bool
+	checks []ResourceCheck
 }
 
 func NewActuator(p ActuatorParams) (Actuator, error) {
-	var err error
-	var sqlDB *sql.DB
+	var checks []ResourceCheck
+
+	// DB check
 	if p.DB != nil {
-		sqlDB, err = p.DB.DB()
+		sqlDB, err := p.DB.DB()
 		if err != nil {
 			return nil, err
 		}
+		checks = append(checks, func(ctx context.Context) error {
+			return sqlDB.PingContext(ctx)
+		})
 	}
 
 	a := &actuatorImpl{
-		db: sqlDB,
+		checks: checks,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -65,24 +70,21 @@ func (a *actuatorImpl) Readiness() bool {
 }
 
 func (a *actuatorImpl) monitor(ctx context.Context) {
-	ticker := time.NewTicker(15 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-			err := a.check(pingCtx)
-			cancel()
-			a.ready.Store(err == nil)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(a.checks))
 
-func (a *actuatorImpl) check(ctx context.Context) error {
-	if a.db != nil {
-		return a.db.PingContext(ctx)
+	for _, check := range a.checks {
+		wg.Add(1)
+		go func(c ResourceCheck) {
+			defer wg.Done()
+			if err := c(ctx); err != nil {
+				errCh <- err
+			}
+		}(check)
 	}
-	return nil
+
+	wg.Wait()
+	close(errCh)
+
+	a.ready.Store(len(errCh) == 0)
 }
