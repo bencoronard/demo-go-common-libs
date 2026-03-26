@@ -91,13 +91,11 @@ func (a *actuatorImpl) checkResources(ctx context.Context) bool {
 	errCh := make(chan error, len(a.checks))
 
 	for _, check := range a.checks {
-		wg.Add(1)
-		go func(c ResourceCheck) {
-			defer wg.Done()
-			if err := c(ctx); err != nil {
+		wg.Go(func() {
+			if err := check(ctx); err != nil {
 				errCh <- err
 			}
-		}(check)
+		})
 	}
 
 	wg.Wait()
