@@ -2,6 +2,7 @@ package actuator
 
 import (
 	"context"
+	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -71,7 +72,7 @@ func (a *actuatorImpl) Readiness() bool {
 }
 
 func (a *actuatorImpl) monitor(ctx context.Context) {
-	ticker := time.NewTicker(15 * time.Second)
+	ticker := time.NewTicker(15*time.Second + rand.N(3*time.Second))
 	defer ticker.Stop()
 	for {
 		select {
