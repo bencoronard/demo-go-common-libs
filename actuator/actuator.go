@@ -72,12 +72,13 @@ func (a *actuatorImpl) Readiness() bool {
 }
 
 func (a *actuatorImpl) monitor(ctx context.Context) {
-	ticker := time.NewTicker(15*time.Second + rand.N(3*time.Second))
+	interval := 15*time.Second + rand.N(3*time.Second)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			pingCtx, cancel := context.WithTimeout(ctx, interval-5*time.Second)
 			ready := a.checkResources(pingCtx)
 			cancel()
 			a.ready.Store(ready)
