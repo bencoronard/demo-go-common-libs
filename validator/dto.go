@@ -1,4 +1,4 @@
-package validation
+package validator
 
 type FieldValidationError struct {
 	Field   string
