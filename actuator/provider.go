@@ -94,7 +94,7 @@ type Params struct {
 	Cfg *Config
 }
 
-func NewActuator(p Params) (Actuator, error) {
+func New(p Params) (Actuator, error) {
 	a := &actuator{
 		hc:  p.HC,
 		cfg: p.Cfg,
