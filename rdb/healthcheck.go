@@ -10,25 +10,25 @@ import (
 	"gorm.io/gorm"
 )
 
-type dbHealthChecker struct {
+type healthChecker struct {
 	name string
 	db   *sql.DB
 }
 
-func (d *dbHealthChecker) Name() string {
+func (d *healthChecker) Name() string {
 	return d.name
 }
 
-func (d *dbHealthChecker) Check(ctx context.Context) error {
+func (d *healthChecker) Check(ctx context.Context) error {
 	return d.db.PingContext(ctx)
 }
 
-type DBHealthCheckerParams struct {
+type HealthCheckerParams struct {
 	fx.In
 	DB *gorm.DB
 }
 
-func NewDBHealthChecker(p DBHealthCheckerParams) (actuator.HealthChecker, error) {
+func NewDBHealthChecker(p HealthCheckerParams) (actuator.HealthChecker, error) {
 	sqlDB, err := p.DB.DB()
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func NewDBHealthChecker(p DBHealthCheckerParams) (actuator.HealthChecker, error)
 
 	name := fmt.Sprintf("rdb_%s", p.DB.Dialector.Name())
 
-	return &dbHealthChecker{
+	return &healthChecker{
 		name: name,
 		db:   sqlDB,
 	}, nil
