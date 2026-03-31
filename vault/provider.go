@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	vault "github.com/hashicorp/vault/api"
 	"github.com/mitchellh/mapstructure"
 	"go.uber.org/fx"
 
+	vault "github.com/hashicorp/vault/api"
 	authAppRole "github.com/hashicorp/vault/api/auth/approle"
 	authK8s "github.com/hashicorp/vault/api/auth/kubernetes"
 	authUsrPsw "github.com/hashicorp/vault/api/auth/userpass"
@@ -84,11 +84,9 @@ func (c *client) runTokenRenewalLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			// Renewal
 			if err := c.manageTokenLifecycle(ctx); err != nil {
 				return
 			}
-			// Re-authentication
 			if _, err := c.login(ctx); err != nil {
 				continue
 			}
@@ -128,32 +126,6 @@ func (c *client) manageTokenLifecycle(ctx context.Context) error {
 	}
 }
 
-func newClient(lc fx.Lifecycle, addr string, auth vault.AuthMethod) (Client, error) {
-	cfg := vault.DefaultConfig()
-	cfg.Address = addr
-
-	vc, err := vault.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	c := client{vc: vc, auth: auth}
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			if _, err := c.login(ctx); err != nil {
-				return err
-			}
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
-		},
-	})
-
-	return &c, nil
-}
-
 func NewK8sClient(lc fx.Lifecycle, addr, role, mountPath string) (Client, error) {
 	auth, err := authK8s.NewKubernetesAuth(role, authK8s.WithServiceAccountTokenPath(mountPath))
 	if err != nil {
@@ -180,6 +152,10 @@ func NewUserPassClient(lc fx.Lifecycle, addr, usr, psw string) (Client, error) {
 
 func NewTokenClient(lc fx.Lifecycle, addr, token string) (Client, error) {
 	cfg := vault.DefaultConfig()
+	if cfg.Error != nil {
+		return nil, cfg.Error
+	}
+
 	cfg.Address = addr
 
 	vc, err := vault.NewClient(cfg)
@@ -196,6 +172,36 @@ func NewTokenClient(lc fx.Lifecycle, addr, token string) (Client, error) {
 				return err
 			}
 			return nil
+		},
+	})
+
+	return &c, nil
+}
+
+func newClient(lc fx.Lifecycle, addr string, auth vault.AuthMethod) (Client, error) {
+	cfg := vault.DefaultConfig()
+	if cfg.Error != nil {
+		return nil, cfg.Error
+	}
+
+	cfg.Address = addr
+
+	vc, err := vault.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	c := client{vc: vc, auth: auth}
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			if _, err := c.login(ctx); err != nil {
+				return err
+			}
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
 		},
 	})
 
