@@ -16,7 +16,7 @@ import (
 	"go.uber.org/fx"
 )
 
-type OtelParams struct {
+type Params struct {
 	fx.In
 	Lc   fx.Lifecycle
 	Prop propagation.TextMapPropagator
@@ -33,7 +33,7 @@ func NewPropagator() (propagation.TextMapPropagator, error) {
 	return prop, nil
 }
 
-func NewTracerProvider(p OtelParams) (*trace.TracerProvider, error) {
+func NewTracerProvider(p Params) (*trace.TracerProvider, error) {
 	exporter, err := otlptracegrpc.New(context.Background())
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func NewTracerProvider(p OtelParams) (*trace.TracerProvider, error) {
 	return provider, nil
 }
 
-func NewMeterProvider(p OtelParams) (*metric.MeterProvider, error) {
+func NewMeterProvider(p Params) (*metric.MeterProvider, error) {
 	exporter, err := otlpmetricgrpc.New(context.Background())
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func NewMeterProvider(p OtelParams) (*metric.MeterProvider, error) {
 	return provider, nil
 }
 
-func NewLoggerProvider(p OtelParams) (*log.LoggerProvider, error) {
+func NewLoggerProvider(p Params) (*log.LoggerProvider, error) {
 	exporter, err := otlploggrpc.New(context.Background())
 	if err != nil {
 		return nil, err
