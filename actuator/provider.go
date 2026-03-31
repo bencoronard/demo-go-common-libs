@@ -12,7 +12,7 @@ import (
 	"go.uber.org/fx"
 )
 
-type ActuatorConfig struct {
+type Config struct {
 	HealthCheckTimeout        time.Duration
 	HealthCheckTimeoutPerTask time.Duration
 }
@@ -22,21 +22,21 @@ type Actuator interface {
 	Readiness() bool
 }
 
-type actuatorImpl struct {
+type actuator struct {
 	ready atomic.Bool
 	hc    []HealthChecker
-	cfg   *ActuatorConfig
+	cfg   *Config
 }
 
-func (a *actuatorImpl) Liveness() bool {
+func (a *actuator) Liveness() bool {
 	return true
 }
 
-func (a *actuatorImpl) Readiness() bool {
+func (a *actuator) Readiness() bool {
 	return a.ready.Load()
 }
 
-func (a *actuatorImpl) healthCheck(ctx context.Context) {
+func (a *actuator) healthCheck(ctx context.Context) {
 	errCh := make(chan error, len(a.hc))
 
 	var wg sync.WaitGroup
@@ -69,7 +69,7 @@ func (a *actuatorImpl) healthCheck(ctx context.Context) {
 	a.ready.Store(ready)
 }
 
-func (a *actuatorImpl) monitor(ctx context.Context) {
+func (a *actuator) monitor(ctx context.Context) {
 	jitter := rand.N(3000 * time.Millisecond)
 	ticker := time.NewTicker(a.cfg.HealthCheckTimeout + jitter)
 	defer ticker.Stop()
@@ -87,15 +87,15 @@ func (a *actuatorImpl) monitor(ctx context.Context) {
 	}
 }
 
-type ActuatorParams struct {
+type Params struct {
 	fx.In
 	Lc  fx.Lifecycle
 	HC  []HealthChecker
-	Cfg *ActuatorConfig
+	Cfg *Config
 }
 
-func NewActuator(p ActuatorParams) (Actuator, error) {
-	a := &actuatorImpl{
+func NewActuator(p Params) (Actuator, error) {
+	a := &actuator{
 		hc:  p.HC,
 		cfg: p.Cfg,
 	}
@@ -107,7 +107,7 @@ func NewActuator(p ActuatorParams) (Actuator, error) {
 			go a.monitor(ctx)
 			return nil
 		},
-		OnStop: func(_ context.Context) error {
+		OnStop: func(ctx context.Context) error {
 			cancel()
 			return nil
 		},
