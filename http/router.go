@@ -17,14 +17,17 @@ type Router interface {
 	RegisterRoutes()
 }
 
-type RouterStartParams struct {
+type RouterParams struct {
 	fx.In
 	Lifecycle  fx.Lifecycle
 	Shutdowner fx.Shutdowner
 	Router     Router
 }
 
-func Start(p RouterStartParams) {
+func Start(p RouterParams) {
+	p.Router.RegisterMiddlewares()
+	p.Router.RegisterRoutes()
+
 	s := http.Server{
 		Addr:    fmt.Sprintf(":%d", p.Router.Port()),
 		Handler: p.Router.Handler(),
@@ -39,14 +42,14 @@ func Start(p RouterStartParams) {
 			)
 			go func() {
 				if err := s.ListenAndServe(); err != http.ErrServerClosed {
-					slog.Error("Failed to start HTTP server", "error", err)
+					slog.Error("failed to start HTTP server", "error", err)
 					p.Shutdowner.Shutdown()
 				}
 			}()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			slog.Info("HTTP server shutting down...")
+			slog.Info("initiated HTTP server shutdown sequence")
 			return s.Shutdown(ctx)
 		},
 	})

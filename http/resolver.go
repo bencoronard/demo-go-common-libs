@@ -14,15 +14,11 @@ type AuthHeaderResolver interface {
 	ExtractClaims(r *http.Request) (jwt.MapClaims, error)
 }
 
-type authHeaderResolverImpl struct {
+type authHeaderResolver struct {
 	verifier xjwt.Verifier
 }
 
-func NewHttpAuthHeaderResolver(verifier xjwt.Verifier) AuthHeaderResolver {
-	return &authHeaderResolverImpl{verifier: verifier}
-}
-
-func (h *authHeaderResolverImpl) ExtractClaims(r *http.Request) (jwt.MapClaims, error) {
+func (h *authHeaderResolver) ExtractClaims(r *http.Request) (jwt.MapClaims, error) {
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
 	if header == "" {
 		return nil, fmt.Errorf("%w: missing Authorization header", ErrMissingRequestHeader)
@@ -39,4 +35,8 @@ func (h *authHeaderResolverImpl) ExtractClaims(r *http.Request) (jwt.MapClaims, 
 	}
 
 	return claims, nil
+}
+
+func NewHttpAuthHeaderResolver(verifier xjwt.Verifier) AuthHeaderResolver {
+	return &authHeaderResolver{verifier: verifier}
 }

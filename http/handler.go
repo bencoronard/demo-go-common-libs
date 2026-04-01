@@ -10,7 +10,7 @@ import (
 	"github.com/bencoronard/demo-go-common-libs/auth"
 	"github.com/bencoronard/demo-go-common-libs/dto"
 	"github.com/bencoronard/demo-go-common-libs/jwt"
-	"github.com/bencoronard/demo-go-common-libs/validation"
+	xvalidator "github.com/bencoronard/demo-go-common-libs/validator"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -22,29 +22,16 @@ type AppErrorHandler interface {
 	Handle(err error, pd dto.ProblemDetail) (dto.ProblemDetail, bool)
 }
 
-type GlobalErrorHandlerParams struct {
-	fx.In
-	AppErrHandler  AppErrorHandler          `optional:"true"`
-	TracerProvider *sdktrace.TracerProvider `optional:"true"`
-}
-
 type GlobalErrorHandler interface {
 	GetHandler() func(c *echo.Context, err error)
 }
 
-type globalErrorHandlerImpl struct {
+type globalErrorHandler struct {
 	ah AppErrorHandler
 	tp *sdktrace.TracerProvider
 }
 
-func NewGlobalErrorHandler(p GlobalErrorHandlerParams) GlobalErrorHandler {
-	return &globalErrorHandlerImpl{
-		ah: p.AppErrHandler,
-		tp: p.TracerProvider,
-	}
-}
-
-func (h *globalErrorHandlerImpl) extractTraceID(ctx context.Context) string {
+func (h *globalErrorHandler) extractTraceID(ctx context.Context) string {
 	if h.tp == nil {
 		return ""
 	}
@@ -55,7 +42,7 @@ func (h *globalErrorHandlerImpl) extractTraceID(ctx context.Context) string {
 	return ""
 }
 
-func (h *globalErrorHandlerImpl) GetHandler() func(c *echo.Context, err error) {
+func (h *globalErrorHandler) GetHandler() func(c *echo.Context, err error) {
 	return func(c *echo.Context, err error) {
 		if resp, err := echo.UnwrapResponse(c.Response()); err == nil && resp.Committed {
 			return
@@ -98,9 +85,9 @@ func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
 	var ve validator.ValidationErrors
 	switch {
 	case errors.As(err, &ve):
-		var validationDetails []validation.FieldValidationError
+		var validationDetails []xvalidator.FieldValidationError
 		for _, fe := range ve {
-			validationDetails = append(validationDetails, validation.FieldValidationError{
+			validationDetails = append(validationDetails, xvalidator.FieldValidationError{
 				Field:   fe.Field(),
 				Message: fe.Error(),
 			})
@@ -126,5 +113,18 @@ func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
 	default:
 		slog.Error("unhandled error", "error", err)
 		return pd
+	}
+}
+
+type GlobalErrorHandlerParams struct {
+	fx.In
+	AppErrHandler  AppErrorHandler          `optional:"true"`
+	TracerProvider *sdktrace.TracerProvider `optional:"true"`
+}
+
+func NewGlobalErrorHandler(p GlobalErrorHandlerParams) GlobalErrorHandler {
+	return &globalErrorHandler{
+		ah: p.AppErrHandler,
+		tp: p.TracerProvider,
 	}
 }
