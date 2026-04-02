@@ -126,47 +126,94 @@ func (c *client) manageTokenLifecycle(ctx context.Context) error {
 	}
 }
 
-func NewK8sClient(lc fx.Lifecycle, addr, role, mountPath string) (Client, error) {
-	auth, err := authK8s.NewKubernetesAuth(role, authK8s.WithServiceAccountTokenPath(mountPath))
+type K8sClientConfig struct {
+	VaultAddr      string
+	RoleName       string
+	TokenMountPath string
+}
+
+type K8sClientParams struct {
+	fx.In
+	Lc  fx.Lifecycle
+	Cfg *K8sClientConfig
+}
+
+func NewK8sClient(p K8sClientParams) (Client, error) {
+	auth, err := authK8s.NewKubernetesAuth(p.Cfg.RoleName, authK8s.WithServiceAccountTokenPath(p.Cfg.TokenMountPath))
 	if err != nil {
 		return nil, err
 	}
-	return newClient(lc, addr, auth)
+	return newClient(p.Lc, p.Cfg.VaultAddr, auth)
 }
 
-func NewAppRoleClient(lc fx.Lifecycle, addr, roleID, secretID string) (Client, error) {
-	auth, err := authAppRole.NewAppRoleAuth(roleID, &authAppRole.SecretID{FromString: secretID})
+type AppRoleClientConfig struct {
+	VaultAddr string
+	RoleID    string
+	SecretID  string
+}
+
+type AppRoleClientParams struct {
+	fx.In
+	Lc  fx.Lifecycle
+	Cfg *AppRoleClientConfig
+}
+
+func NewAppRoleClient(p AppRoleClientParams) (Client, error) {
+	auth, err := authAppRole.NewAppRoleAuth(p.Cfg.RoleID, &authAppRole.SecretID{FromString: p.Cfg.SecretID})
 	if err != nil {
 		return nil, err
 	}
-	return newClient(lc, addr, auth)
+	return newClient(p.Lc, p.Cfg.VaultAddr, auth)
 }
 
-func NewUserPassClient(lc fx.Lifecycle, addr, usr, psw string) (Client, error) {
-	auth, err := authUsrPsw.NewUserpassAuth(usr, &authUsrPsw.Password{FromString: psw})
+type UserPassClientConfig struct {
+	VaultAddr string
+	Username  string
+	Password  string
+}
+
+type UserPassClientParams struct {
+	fx.In
+	Lc  fx.Lifecycle
+	Cfg *UserPassClientConfig
+}
+
+func NewUserPassClient(p UserPassClientParams) (Client, error) {
+	auth, err := authUsrPsw.NewUserpassAuth(p.Cfg.Username, &authUsrPsw.Password{FromString: p.Cfg.Password})
 	if err != nil {
 		return nil, err
 	}
-	return newClient(lc, addr, auth)
+	return newClient(p.Lc, p.Cfg.VaultAddr, auth)
 }
 
-func NewTokenClient(lc fx.Lifecycle, addr, token string) (Client, error) {
+type TokenClientConfig struct {
+	VaultAddr string
+	Token     string
+}
+
+type TokenClientParams struct {
+	fx.In
+	Lc  fx.Lifecycle
+	Cfg *TokenClientConfig
+}
+
+func NewTokenClient(p TokenClientParams) (Client, error) {
 	cfg := vault.DefaultConfig()
 	if cfg.Error != nil {
 		return nil, cfg.Error
 	}
 
-	cfg.Address = addr
+	cfg.Address = p.Cfg.VaultAddr
 
 	vc, err := vault.NewClient(cfg)
 	if err != nil {
 		return nil, err
 	}
-	vc.SetToken(token)
+	vc.SetToken(p.Cfg.Token)
 
 	c := client{vc: vc}
 
-	lc.Append(fx.Hook{
+	p.Lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if _, err := vc.Auth().Token().LookupSelfWithContext(ctx); err != nil {
 				return err
