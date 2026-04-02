@@ -16,21 +16,25 @@ import (
 	"go.uber.org/fx"
 )
 
-type Params struct {
-	fx.In
-	Lc   fx.Lifecycle
-	Prop propagation.TextMapPropagator
-	Res  *resource.Resource
+func NewResource() *resource.Resource {
+	return resource.Environment()
 }
 
-func NewPropagator() (propagation.TextMapPropagator, error) {
+func NewPropagator() propagation.TextMapPropagator {
 	prop := propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	)
 	otel.SetTextMapPropagator(prop)
 
-	return prop, nil
+	return prop
+}
+
+type Params struct {
+	fx.In
+	Lc   fx.Lifecycle
+	Prop propagation.TextMapPropagator
+	Res  *resource.Resource
 }
 
 func NewTracerProvider(p Params) (*trace.TracerProvider, error) {
