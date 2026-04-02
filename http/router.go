@@ -24,7 +24,7 @@ type RouterParams struct {
 	Router     Router
 }
 
-func Start(p RouterParams) {
+func StartServer(p RouterParams) {
 	p.Router.RegisterMiddlewares()
 	p.Router.RegisterRoutes()
 
