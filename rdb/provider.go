@@ -10,10 +10,10 @@ import (
 )
 
 type DBConfig struct {
-	CPCap         int
-	CPIdleMin     int
-	CPConnTTL     time.Duration
-	CPIdleTimeout time.Duration
+	MaxOpenConns int
+	MaxIdleConns int
+	ConnMaxTTL   time.Duration
+	IdleTimeout  time.Duration
 }
 
 type DBParams struct {
@@ -36,10 +36,10 @@ func NewDB(p DBParams) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	sqlDB.SetMaxOpenConns(p.Cfg.CPCap)
-	sqlDB.SetMaxIdleConns(p.Cfg.CPIdleMin)
-	sqlDB.SetConnMaxLifetime(p.Cfg.CPConnTTL)
-	sqlDB.SetConnMaxIdleTime(p.Cfg.CPIdleTimeout)
+	sqlDB.SetMaxOpenConns(p.Cfg.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(p.Cfg.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(p.Cfg.ConnMaxTTL)
+	sqlDB.SetConnMaxIdleTime(p.Cfg.IdleTimeout)
 
 	p.Lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
