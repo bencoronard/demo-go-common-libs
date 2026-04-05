@@ -2,8 +2,10 @@ package rdb
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/bencoronard/demo-go-common-libs/actuator"
 	"go.uber.org/fx"
 
 	"gorm.io/gorm"
@@ -20,7 +22,7 @@ type DBParams struct {
 	fx.In
 	Lc  fx.Lifecycle
 	Dl  gorm.Dialector
-	Cfg *Config
+	Cfg Config
 }
 
 func NewDB(p DBParams) (*gorm.DB, error) {
@@ -51,4 +53,36 @@ func NewDB(p DBParams) (*gorm.DB, error) {
 	})
 
 	return db, nil
+}
+
+type TransactionManager interface {
+	Transactional(ctx context.Context, fn func(tx *gorm.DB) error) error
+}
+
+type TMParams struct {
+	fx.In
+	DB *gorm.DB
+}
+
+func NewTransactionManager(p TMParams) (TransactionManager, error) {
+	return &transactionManager{db: p.DB}, nil
+}
+
+type HealthCheckerParams struct {
+	fx.In
+	DB *gorm.DB
+}
+
+func NewDBHealthChecker(p HealthCheckerParams) (actuator.HealthChecker, error) {
+	sqlDB, err := p.DB.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	name := fmt.Sprintf("rdb_%s", p.DB.Dialector.Name())
+
+	return &healthChecker{
+		name: name,
+		db:   sqlDB,
+	}, nil
 }
