@@ -9,21 +9,26 @@ import (
 	"gorm.io/gorm"
 )
 
-type PGConfig struct {
+type DriverConfig struct {
 	Host     string
 	Port     int
 	User     string
 	Password string
 	DBName   string
-	SSLMode  string
+	UseSSL   bool
 }
 
-type PGParams struct {
+type DriverParams struct {
 	fx.In
-	Cfg PGConfig
+	Cfg DriverConfig
 }
 
-func NewPGDriver(p PGParams) gorm.Dialector {
+func NewPGDriver(p DriverParams) gorm.Dialector {
+	sslMode := "disable"
+	if p.Cfg.UseSSL {
+		sslMode = "require"
+	}
+
 	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		p.Cfg.Host,
@@ -31,7 +36,7 @@ func NewPGDriver(p PGParams) gorm.Dialector {
 		p.Cfg.User,
 		p.Cfg.Password,
 		p.Cfg.DBName,
-		p.Cfg.SSLMode,
+		sslMode,
 	)
 
 	dialector := postgres.Open(dsn)

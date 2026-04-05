@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type Config struct {
+type DBConfig struct {
 	MaxOpenConns int
 	MaxIdleConns int
 	ConnMaxTTL   time.Duration
@@ -22,7 +22,7 @@ type DBParams struct {
 	fx.In
 	Lc  fx.Lifecycle
 	Dl  gorm.Dialector
-	Cfg Config
+	Cfg DBConfig
 }
 
 func NewDB(p DBParams) (*gorm.DB, error) {
