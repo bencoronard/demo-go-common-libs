@@ -52,22 +52,36 @@ func (i *asymmIssuer) IssueToken(sub string, aud []string, claims map[string]any
 	return issueToken(jwt.SigningMethodRS256, mc, i.key)
 }
 
-func NewUnsignedIssuer(iss string) (Issuer, error) {
-	return &unsignedIssuer{iss: iss}, nil
+type UnsignedIssuerConfig struct {
+	Issuer string
 }
 
-func NewSymmIssuer(iss string, key []byte) (Issuer, error) {
-	if len(key) == 0 {
+func NewUnsignedIssuer(cfg UnsignedIssuerConfig) (Issuer, error) {
+	return &unsignedIssuer{iss: cfg.Issuer}, nil
+}
+
+type SymmIssuerConfig struct {
+	Issuer string
+	Key    []byte
+}
+
+func NewSymmIssuer(cfg SymmIssuerConfig) (Issuer, error) {
+	if len(cfg.Key) == 0 {
 		return nil, fmt.Errorf("%w: key must not be empty", ErrConstructInstanceFail)
 	}
-	return &symmIssuer{iss: iss, key: key}, nil
+	return &symmIssuer{iss: cfg.Issuer, key: cfg.Key}, nil
 }
 
-func NewAsymmIssuer(iss string, key *rsa.PrivateKey) (Issuer, error) {
-	if key == nil {
+type AsymmIssuerConfig struct {
+	Issuer string
+	Key    *rsa.PrivateKey
+}
+
+func NewAsymmIssuer(cfg AsymmIssuerConfig) (Issuer, error) {
+	if cfg.Key == nil {
 		return nil, fmt.Errorf("%w: private key must not be nil", ErrConstructInstanceFail)
 	}
-	return &asymmIssuer{iss: iss, key: key}, nil
+	return &asymmIssuer{iss: cfg.Issuer, key: cfg.Key}, nil
 }
 
 type Verifier interface {
@@ -115,22 +129,30 @@ func NewUnsignedVerifier() (Verifier, error) {
 	return &unsignedVerifier{}, nil
 }
 
-func NewSymmVerifier(key []byte) (Verifier, error) {
-	if len(key) == 0 {
+type SymmVerifierConfig struct {
+	Key []byte
+}
+
+func NewSymmVerifier(cfg SymmVerifierConfig) (Verifier, error) {
+	if len(cfg.Key) == 0 {
 		return nil, fmt.Errorf("%w: key must not be empty", ErrConstructInstanceFail)
 	}
 
-	keyCopy := make([]byte, len(key))
-	copy(keyCopy, key)
+	keyCopy := make([]byte, len(cfg.Key))
+	copy(keyCopy, cfg.Key)
 
 	return &symmVerifier{key: keyCopy}, nil
 }
 
-func NewAsymmVerifier(key *rsa.PublicKey) (Verifier, error) {
-	if key == nil {
+type AsymmVerifierConfig struct {
+	Key *rsa.PublicKey
+}
+
+func NewAsymmVerifier(cfg AsymmVerifierConfig) (Verifier, error) {
+	if cfg.Key == nil {
 		return nil, fmt.Errorf("%w: public key must not be nil", ErrConstructInstanceFail)
 	}
-	return &asymmVerifier{key: key}, nil
+	return &asymmVerifier{key: cfg.Key}, nil
 }
 
 func buildClaims(iss string, sub string, aud []string, claims map[string]any, ttl time.Duration, nbf time.Time) (jwt.MapClaims, error) {
