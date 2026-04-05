@@ -26,7 +26,7 @@ type Params struct {
 	fx.In
 	Lc  fx.Lifecycle
 	Hc  []HealthChecker
-	Cfg *Config
+	Cfg Config
 }
 
 func New(p Params) (Actuator, error) {

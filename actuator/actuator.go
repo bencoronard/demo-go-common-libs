@@ -13,7 +13,7 @@ import (
 type actuator struct {
 	ready atomic.Bool
 	hc    []HealthChecker
-	cfg   *Config
+	cfg   Config
 }
 
 func (a *actuator) Liveness() bool {
