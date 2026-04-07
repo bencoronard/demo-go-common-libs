@@ -17,17 +17,17 @@ type ServerParams struct {
 	Sd fx.Shutdowner
 }
 
-type HTTPServer interface {
+type HttpServer interface {
 	Instance() *http.Server
 	Configure() error
 }
 
-type HTTPServerParams struct {
+type HttpServerParams struct {
 	ServerParams
-	Srv HTTPServer
+	Srv HttpServer
 }
 
-func ServeHTTP(p HTTPServerParams) error {
+func ServeHttp(p HttpServerParams) error {
 	if err := p.Srv.Configure(); err != nil {
 		return err
 	}
@@ -56,18 +56,18 @@ func ServeHTTP(p HTTPServerParams) error {
 	return nil
 }
 
-type GRPCServer interface {
+type GrpcServer interface {
 	Instance() *grpc.Server
 	Listener() net.Listener
 	Configure() error
 }
 
-type GRPCServerParams struct {
+type GrpcServerParams struct {
 	ServerParams
-	Srv GRPCServer
+	Srv GrpcServer
 }
 
-func ServeGRPC(p GRPCServerParams) error {
+func ServeGrpc(p GrpcServerParams) error {
 	if err := p.Srv.Configure(); err != nil {
 		return err
 	}
