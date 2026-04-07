@@ -10,10 +10,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type AuthHeaderResolver interface {
-	ExtractClaims(r *http.Request) (jwt.MapClaims, error)
-}
-
 type authHeaderResolver struct {
 	verifier xjwt.Verifier
 }
@@ -35,8 +31,4 @@ func (h *authHeaderResolver) ExtractClaims(r *http.Request) (jwt.MapClaims, erro
 	}
 
 	return claims, nil
-}
-
-func NewHttpAuthHeaderResolver(verifier xjwt.Verifier) AuthHeaderResolver {
-	return &authHeaderResolver{verifier: verifier}
 }

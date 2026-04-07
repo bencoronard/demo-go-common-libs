@@ -15,16 +15,7 @@ import (
 	"github.com/labstack/echo/v5"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/fx"
 )
-
-type AppErrorHandler interface {
-	Handle(err error, pd dto.ProblemDetail) (dto.ProblemDetail, bool)
-}
-
-type GlobalErrorHandler interface {
-	GetHandler() func(c *echo.Context, err error)
-}
 
 type globalErrorHandler struct {
 	ah AppErrorHandler
@@ -113,18 +104,5 @@ func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
 	default:
 		slog.Error("unhandled error", "error", err)
 		return pd
-	}
-}
-
-type GlobalErrorHandlerParams struct {
-	fx.In
-	AppErrHandler  AppErrorHandler          `optional:"true"`
-	TracerProvider *sdktrace.TracerProvider `optional:"true"`
-}
-
-func NewGlobalErrorHandler(p GlobalErrorHandlerParams) GlobalErrorHandler {
-	return &globalErrorHandler{
-		ah: p.AppErrHandler,
-		tp: p.TracerProvider,
 	}
 }
