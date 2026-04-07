@@ -16,6 +16,11 @@ type Client interface {
 	WatchTokenLifecycle(lc fx.Lifecycle) error
 }
 
+type ClientParams struct {
+	fx.In
+	Lc fx.Lifecycle
+}
+
 type K8sClientConfig struct {
 	VaultAddr      string
 	RoleName       string
@@ -23,8 +28,7 @@ type K8sClientConfig struct {
 }
 
 type K8sClientParams struct {
-	fx.In
-	Lc  fx.Lifecycle
+	ClientParams
 	Cfg K8sClientConfig
 }
 
@@ -43,8 +47,7 @@ type AppRoleClientConfig struct {
 }
 
 type AppRoleClientParams struct {
-	fx.In
-	Lc  fx.Lifecycle
+	ClientParams
 	Cfg AppRoleClientConfig
 }
 
@@ -63,8 +66,7 @@ type UserPassClientConfig struct {
 }
 
 type UserPassClientParams struct {
-	fx.In
-	Lc  fx.Lifecycle
+	ClientParams
 	Cfg UserPassClientConfig
 }
 
@@ -82,8 +84,7 @@ type TokenClientConfig struct {
 }
 
 type TokenClientParams struct {
-	fx.In
-	Lc  fx.Lifecycle
+	ClientParams
 	Cfg TokenClientConfig
 }
 
