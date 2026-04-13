@@ -2,14 +2,10 @@ package vault
 
 import (
 	"context"
-	"os"
 
 	"go.uber.org/fx"
 
 	vault "github.com/hashicorp/vault/api"
-	authAppRole "github.com/hashicorp/vault/api/auth/approle"
-	authK8s "github.com/hashicorp/vault/api/auth/kubernetes"
-	authUsrPsw "github.com/hashicorp/vault/api/auth/userpass"
 )
 
 type Client interface {
@@ -19,48 +15,8 @@ type Client interface {
 
 type Params struct {
 	fx.In
-	Lc fx.Lifecycle
-}
-
-func NewK8sClient(p Params) (Client, error) {
-	role := os.Getenv("VAULT_ROLE")
-	if role == "" {
-		return nil, ErrConfigUnset
-	}
-
-	auth, err := authK8s.NewKubernetesAuth(role)
-	if err != nil {
-		return nil, err
-	}
-
-	return newClient(p.Lc, auth)
-}
-
-func NewAppRoleClient(p Params) (Client, error) {
-	role := os.Getenv("VAULT_ROLE")
-	if role == "" {
-		return nil, ErrConfigUnset
-	}
-
-	auth, err := authAppRole.NewAppRoleAuth(role, &authAppRole.SecretID{FromFile: "VAULT_SECRET"})
-	if err != nil {
-		return nil, err
-	}
-
-	return newClient(p.Lc, auth)
-}
-
-func NewUserPassClient(p Params) (Client, error) {
-	user := os.Getenv("VAULT_USER")
-	if user == "" {
-		return nil, ErrConfigUnset
-	}
-
-	auth, err := authUsrPsw.NewUserpassAuth(user, &authUsrPsw.Password{FromEnv: "VAULT_SECRET"})
-	if err != nil {
-		return nil, err
-	}
-	return newClient(p.Lc, auth)
+	Lc   fx.Lifecycle
+	Auth vault.AuthMethod `optional:"true"`
 }
 
 func NewTokenClient(p Params) (Client, error) {
@@ -88,7 +44,7 @@ func NewTokenClient(p Params) (Client, error) {
 	return &c, nil
 }
 
-func newClient(lc fx.Lifecycle, auth vault.AuthMethod) (Client, error) {
+func NewClient(p Params) (Client, error) {
 	cfg := vault.DefaultConfig()
 	if cfg.Error != nil {
 		return nil, cfg.Error
@@ -99,9 +55,9 @@ func newClient(lc fx.Lifecycle, auth vault.AuthMethod) (Client, error) {
 		return nil, err
 	}
 
-	c := client{vc: vc, auth: auth}
+	c := client{vc: vc, auth: p.Auth}
 
-	lc.Append(fx.Hook{
+	p.Lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if _, err := c.login(ctx); err != nil {
 				return err
