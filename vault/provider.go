@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"os"
 
 	"go.uber.org/fx"
 
@@ -16,91 +17,62 @@ type Client interface {
 	WatchTokenLifecycle(lc fx.Lifecycle) error
 }
 
-type ClientParams struct {
+type Params struct {
 	fx.In
 	Lc fx.Lifecycle
 }
 
-type K8sClientConfig struct {
-	VaultAddr      string
-	RoleName       string
-	TokenMountPath string
-}
+func NewK8sClient(p Params) (Client, error) {
+	role := os.Getenv("VAULT_ROLE")
+	if role == "" {
+		return nil, ErrConfigUnset
+	}
 
-type K8sClientParams struct {
-	ClientParams
-	Cfg K8sClientConfig
-}
-
-func NewK8sClient(p K8sClientParams) (Client, error) {
-	auth, err := authK8s.NewKubernetesAuth(p.Cfg.RoleName, authK8s.WithServiceAccountTokenPath(p.Cfg.TokenMountPath))
+	auth, err := authK8s.NewKubernetesAuth(role)
 	if err != nil {
 		return nil, err
 	}
-	return newClient(p.Lc, p.Cfg.VaultAddr, auth)
+
+	return newClient(p.Lc, auth)
 }
 
-type AppRoleClientConfig struct {
-	VaultAddr string
-	RoleID    string
-	SecretID  string
-}
+func NewAppRoleClient(p Params) (Client, error) {
+	role := os.Getenv("VAULT_ROLE")
+	if role == "" {
+		return nil, ErrConfigUnset
+	}
 
-type AppRoleClientParams struct {
-	ClientParams
-	Cfg AppRoleClientConfig
-}
-
-func NewAppRoleClient(p AppRoleClientParams) (Client, error) {
-	auth, err := authAppRole.NewAppRoleAuth(p.Cfg.RoleID, &authAppRole.SecretID{FromString: p.Cfg.SecretID})
+	auth, err := authAppRole.NewAppRoleAuth(role, &authAppRole.SecretID{FromFile: "VAULT_SECRET"})
 	if err != nil {
 		return nil, err
 	}
-	return newClient(p.Lc, p.Cfg.VaultAddr, auth)
+
+	return newClient(p.Lc, auth)
 }
 
-type UserPassClientConfig struct {
-	VaultAddr string
-	Username  string
-	Password  string
-}
+func NewUserPassClient(p Params) (Client, error) {
+	user := os.Getenv("VAULT_USER")
+	if user == "" {
+		return nil, ErrConfigUnset
+	}
 
-type UserPassClientParams struct {
-	ClientParams
-	Cfg UserPassClientConfig
-}
-
-func NewUserPassClient(p UserPassClientParams) (Client, error) {
-	auth, err := authUsrPsw.NewUserpassAuth(p.Cfg.Username, &authUsrPsw.Password{FromString: p.Cfg.Password})
+	auth, err := authUsrPsw.NewUserpassAuth(user, &authUsrPsw.Password{FromEnv: "VAULT_SECRET"})
 	if err != nil {
 		return nil, err
 	}
-	return newClient(p.Lc, p.Cfg.VaultAddr, auth)
+	return newClient(p.Lc, auth)
 }
 
-type TokenClientConfig struct {
-	VaultAddr string
-	Token     string
-}
-
-type TokenClientParams struct {
-	ClientParams
-	Cfg TokenClientConfig
-}
-
-func NewTokenClient(p TokenClientParams) (Client, error) {
+func NewTokenClient(p Params) (Client, error) {
 	cfg := vault.DefaultConfig()
 	if cfg.Error != nil {
 		return nil, cfg.Error
 	}
 
-	cfg.Address = p.Cfg.VaultAddr
-
 	vc, err := vault.NewClient(cfg)
 	if err != nil {
 		return nil, err
 	}
-	vc.SetToken(p.Cfg.Token)
 
 	c := client{vc: vc}
 
@@ -116,13 +88,11 @@ func NewTokenClient(p TokenClientParams) (Client, error) {
 	return &c, nil
 }
 
-func newClient(lc fx.Lifecycle, addr string, auth vault.AuthMethod) (Client, error) {
+func newClient(lc fx.Lifecycle, auth vault.AuthMethod) (Client, error) {
 	cfg := vault.DefaultConfig()
 	if cfg.Error != nil {
 		return nil, cfg.Error
 	}
-
-	cfg.Address = addr
 
 	vc, err := vault.NewClient(cfg)
 	if err != nil {
