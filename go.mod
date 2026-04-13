@@ -7,9 +7,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/vault/api v1.23.0
-	github.com/hashicorp/vault/api/auth/approle v0.12.0
-	github.com/hashicorp/vault/api/auth/kubernetes v0.12.0
-	github.com/hashicorp/vault/api/auth/userpass v0.12.0
 	github.com/labstack/echo/v5 v5.1.0
 	github.com/mitchellh/mapstructure v1.5.0
 	go.opentelemetry.io/otel v1.43.0
