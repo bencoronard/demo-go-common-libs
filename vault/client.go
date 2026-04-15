@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	vault "github.com/hashicorp/vault/api"
 	"github.com/mitchellh/mapstructure"
@@ -12,10 +13,14 @@ import (
 type client struct {
 	vc   *vault.Client
 	auth vault.AuthMethod
+	cfg  Config
 }
 
 func (c *client) ReadSecret(ctx context.Context, path string, target any) error {
-	secret, err := c.vc.Logical().ReadWithContext(ctx, path)
+	readCtx, readCancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
+	defer readCancel()
+
+	secret, err := c.vc.Logical().ReadWithContext(readCtx, path)
 	if err != nil {
 		return err
 	}
@@ -42,14 +47,30 @@ func (c *client) ReadSecret(ctx context.Context, path string, target any) error 
 }
 
 func (c *client) WatchTokenLifecycle(lc fx.Lifecycle) error {
-	renewCtx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			go c.runTokenRenewalLoop(renewCtx)
+		OnStart: func(_ context.Context) error {
+			go func() {
+				for {
+					if ctx.Err() != nil {
+						return
+					}
+
+					token, err := c.authenticate(ctx)
+					if err != nil {
+						slog.Error("Failed to authenticate with vault server", "error", err)
+						continue
+					}
+
+					if err := c.autoRenewToken(ctx, token); err != nil {
+						slog.Error("Failed to renew token", "error", err)
+					}
+				}
+			}()
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
+		OnStop: func(_ context.Context) error {
 			cancel()
 			return nil
 		},
@@ -58,40 +79,31 @@ func (c *client) WatchTokenLifecycle(lc fx.Lifecycle) error {
 	return nil
 }
 
-func (c *client) login(ctx context.Context) (*vault.Secret, error) {
-	authInfo, err := c.vc.Auth().Login(ctx, c.auth)
+func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
+	loginCtx, loginCancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
+	defer loginCancel()
+
+	token, err := c.vc.Auth().Token().LookupSelfWithContext(loginCtx)
 	if err != nil {
 		return nil, err
 	}
-	if authInfo == nil {
-		return nil, fmt.Errorf("%w: no auth info returned", ErrAuthenticationFail)
+
+	// token, err := c.vc.Auth().Login(loginCtx, c.auth)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	if token == nil || token.Auth == nil {
+		return nil, fmt.Errorf("no auth info was returned after login")
 	}
-	return authInfo, nil
+
+	return token, nil
 }
 
-func (c *client) runTokenRenewalLoop(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			if err := c.manageTokenLifecycle(ctx); err != nil {
-				return
-			}
-			if _, err := c.login(ctx); err != nil {
-				continue
-			}
-		}
-	}
-}
-
-func (c *client) manageTokenLifecycle(ctx context.Context) error {
-	token, err := c.vc.Auth().Token().LookupSelfWithContext(ctx)
-	if err != nil {
-		return err
-	}
-
+func (c *client) autoRenewToken(ctx context.Context, token *vault.Secret) error {
 	if !token.Auth.Renewable {
+		slog.Info("Token is not configured to be renewable. Re-attempting login.")
+		<-ctx.Done()
 		return nil
 	}
 
@@ -106,13 +118,16 @@ func (c *client) manageTokenLifecycle(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		case err := <-watcher.DoneCh():
 			if err != nil {
+				slog.Info("Failed to renew token. Re-attempting login.", "error", err)
 				return nil
 			}
+			slog.Info("Token can no longer be renewed. Re-attempting login.")
 			return nil
-		case <-watcher.RenewCh():
+		case renewal := <-watcher.RenewCh():
+			slog.Info("Token successfully renewed", "data", renewal)
 		}
 	}
 }

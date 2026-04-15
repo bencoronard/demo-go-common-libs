@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/fx"
 
@@ -13,35 +14,15 @@ type Client interface {
 	WatchTokenLifecycle(lc fx.Lifecycle) error
 }
 
+type Config struct {
+	ReadTimeout time.Duration
+}
+
 type Params struct {
 	fx.In
 	Lc   fx.Lifecycle
 	Auth vault.AuthMethod `optional:"true"`
-}
-
-func NewTokenClient(p Params) (Client, error) {
-	cfg := vault.DefaultConfig()
-	if cfg.Error != nil {
-		return nil, cfg.Error
-	}
-
-	vc, err := vault.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	c := client{vc: vc}
-
-	p.Lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			if _, err := vc.Auth().Token().LookupSelfWithContext(ctx); err != nil {
-				return err
-			}
-			return nil
-		},
-	})
-
-	return &c, nil
+	Cfg  Config
 }
 
 func NewClient(p Params) (Client, error) {
@@ -55,19 +36,24 @@ func NewClient(p Params) (Client, error) {
 		return nil, err
 	}
 
-	c := client{vc: vc, auth: p.Auth}
+	c := client{vc: vc, auth: p.Auth, cfg: p.Cfg}
 
-	p.Lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			if _, err := c.login(ctx); err != nil {
-				return err
-			}
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return c.vc.Auth().Token().RevokeSelfWithContext(ctx, "")
-		},
-	})
+	if p.Auth == nil {
+		return &c, nil
+	}
+
+	authInfo, err := c.vc.Auth().Login(context.Background(), p.Auth)
+	if err != nil {
+		return nil, err
+	}
+
+	watcher, err := c.vc.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: authInfo})
+	if err != nil {
+		return nil, err
+	}
+
+	go watcher.Start()
+	defer watcher.Stop()
 
 	return &c, nil
 }
