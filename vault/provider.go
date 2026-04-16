@@ -21,6 +21,7 @@ type Config struct {
 	AuthRetryBackoffMult            int
 	AuthRetryBackoffMaxInterval     time.Duration
 	AuthDefaultTtl                  time.Duration
+	TokenFilePath                   string
 }
 
 type Params struct {

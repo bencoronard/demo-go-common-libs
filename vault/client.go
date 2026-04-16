@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
 	"time"
 
 	vault "github.com/hashicorp/vault/api"
@@ -55,9 +57,6 @@ func (c *client) WatchTokenLifecycle(lc fx.Lifecycle) error {
 			go func() {
 				backoff := c.cfg.AuthRetryBackoffInitialInterval
 				for {
-					if ctx.Err() != nil {
-						return
-					}
 					token, err := c.authenticate(ctx)
 					if err != nil {
 						slog.Error("Failed to authenticate with vault server. Re-attempting login.", "error", err)
@@ -89,6 +88,30 @@ func (c *client) WatchTokenLifecycle(lc fx.Lifecycle) error {
 }
 
 func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
+	if c.auth == nil {
+		tokenStr := os.Getenv("VAULT_TOKEN")
+		if tokenStr == "" && c.cfg.TokenFilePath != "" {
+			data, _ := os.ReadFile(c.cfg.TokenFilePath)
+			tokenStr = strings.TrimSpace(string(data))
+		}
+
+		if tokenStr == "" {
+			return nil, fmt.Errorf("no local token found")
+		}
+
+		c.vc.SetToken(tokenStr)
+
+		lookupCtx, cancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
+		defer cancel()
+
+		secret, err := c.vc.Auth().Token().LookupSelfWithContext(lookupCtx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to lookup local token: %w", err)
+		}
+
+		return secret, nil
+	}
+
 	loginCtx, loginCancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
 	defer loginCancel()
 
