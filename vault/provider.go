@@ -20,6 +20,7 @@ type Config struct {
 	AuthRetryBackoffInitialInterval time.Duration
 	AuthRetryBackoffMult            int
 	AuthRetryBackoffMaxInterval     time.Duration
+	AuthDefaultTtl                  time.Duration
 }
 
 type Params struct {

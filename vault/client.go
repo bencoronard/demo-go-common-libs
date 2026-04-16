@@ -60,13 +60,16 @@ func (c *client) WatchTokenLifecycle(lc fx.Lifecycle) error {
 					}
 					token, err := c.authenticate(ctx)
 					if err != nil {
-						slog.Error("Failed to authenticate with vault server", "error", err)
-						time.Sleep(backoff)
-						backoff = min(
-							backoff*time.Duration(c.cfg.AuthRetryBackoffMult),
-							c.cfg.AuthRetryBackoffMaxInterval,
-						)
-						continue
+						slog.Error("Failed to authenticate with vault server. Re-attempting login.", "error", err)
+						select {
+						case <-ctx.Done():
+							return
+						case <-time.After(backoff):
+							if backoff < c.cfg.AuthRetryBackoffMaxInterval {
+								backoff *= time.Duration(c.cfg.AuthRetryBackoffMult)
+							}
+							continue
+						}
 					}
 					backoff = c.cfg.AuthRetryBackoffInitialInterval
 					if err := c.autoRenewToken(ctx, token); err != nil {
@@ -105,7 +108,7 @@ func (c *client) autoRenewToken(ctx context.Context, token *vault.Secret) error 
 	if !token.Auth.Renewable {
 		ttl := time.Duration(token.Auth.LeaseDuration) * time.Second
 		if ttl == 0 {
-			ttl = 1 * time.Minute
+			ttl = c.cfg.AuthDefaultTtl
 		}
 		select {
 		case <-ctx.Done():
