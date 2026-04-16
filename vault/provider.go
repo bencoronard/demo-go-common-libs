@@ -15,7 +15,11 @@ type Client interface {
 }
 
 type Config struct {
-	ReadTimeout time.Duration
+	ReadTimeout                     time.Duration
+	AuthTimeout                     time.Duration
+	AuthRetryBackoffInitialInterval time.Duration
+	AuthRetryBackoffMult            int
+	AuthRetryBackoffMaxInterval     time.Duration
 }
 
 type Params struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	vault "github.com/hashicorp/vault/api"
 	"github.com/mitchellh/mapstructure"
@@ -52,17 +53,22 @@ func (c *client) WatchTokenLifecycle(lc fx.Lifecycle) error {
 	lc.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
 			go func() {
+				backoff := c.cfg.AuthRetryBackoffInitialInterval
 				for {
 					if ctx.Err() != nil {
 						return
 					}
-
 					token, err := c.authenticate(ctx)
 					if err != nil {
 						slog.Error("Failed to authenticate with vault server", "error", err)
+						time.Sleep(backoff)
+						backoff = min(
+							backoff*time.Duration(c.cfg.AuthRetryBackoffMult),
+							c.cfg.AuthRetryBackoffMaxInterval,
+						)
 						continue
 					}
-
+					backoff = c.cfg.AuthRetryBackoffInitialInterval
 					if err := c.autoRenewToken(ctx, token); err != nil {
 						slog.Error("Failed to renew token", "error", err)
 					}
@@ -83,15 +89,10 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 	loginCtx, loginCancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
 	defer loginCancel()
 
-	token, err := c.vc.Auth().Token().LookupSelfWithContext(loginCtx)
+	token, err := c.vc.Auth().Login(loginCtx, c.auth)
 	if err != nil {
 		return nil, err
 	}
-
-	// token, err := c.vc.Auth().Login(loginCtx, c.auth)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	if token == nil || token.Auth == nil {
 		return nil, fmt.Errorf("no auth info was returned after login")
@@ -102,9 +103,17 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 
 func (c *client) autoRenewToken(ctx context.Context, token *vault.Secret) error {
 	if !token.Auth.Renewable {
-		slog.Info("Token is not configured to be renewable. Re-attempting login.")
-		<-ctx.Done()
-		return nil
+		ttl := time.Duration(token.Auth.LeaseDuration) * time.Second
+		if ttl == 0 {
+			ttl = 1 * time.Minute
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(ttl):
+			slog.Info("Token is not configured to be renewable. Re-attempting login.")
+			return nil
+		}
 	}
 
 	watcher, err := c.vc.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: token})
