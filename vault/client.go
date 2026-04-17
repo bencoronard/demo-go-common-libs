@@ -87,57 +87,23 @@ func (c *client) WatchTokenLifecycle(lc fx.Lifecycle) error {
 	return nil
 }
 
-func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
-	if c.auth == nil {
-		tokenStr := os.Getenv("VAULT_TOKEN")
-		if tokenStr == "" && c.cfg.TokenFilePath != "" {
-			data, _ := os.ReadFile(c.cfg.TokenFilePath)
-			tokenStr = strings.TrimSpace(string(data))
-		}
-
-		if tokenStr == "" {
-			return nil, fmt.Errorf("no local token found")
-		}
-
-		c.vc.SetToken(tokenStr)
-
-		lookupCtx, cancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
-		defer cancel()
-
-		secret, err := c.vc.Auth().Token().LookupSelfWithContext(lookupCtx)
-		if err != nil {
-			return nil, err
-		}
-
-		return secret, nil
-	}
-
-	loginCtx, loginCancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
-	defer loginCancel()
-
-	token, err := c.vc.Auth().Login(loginCtx, c.auth)
-	if err != nil {
-		return nil, err
-	}
-
-	if token == nil || token.Auth == nil {
-		return nil, fmt.Errorf("no auth info was returned after login")
-	}
-
-	return token, nil
-}
-
 func (c *client) autoRenewToken(ctx context.Context, token *vault.Secret) error {
 	if !token.Auth.Renewable {
-		ttl := time.Duration(token.Auth.LeaseDuration) * time.Second
-		if ttl == 0 {
-			ttl = c.cfg.AuthDefaultTtl
+		if token.Auth.LeaseDuration == 0 {
+			slog.Info("Token has no TTL and is not renewable. Waiting for context cancellation.")
+			<-ctx.Done()
+			return nil
 		}
+
+		ttl := time.Duration(token.Auth.LeaseDuration) * time.Second
+		ttl = ttl * 2 / 3
+
+		slog.Info("Token is not renewable. Re-attempting login before TTL expiry.", "wait", ttl)
+
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-time.After(ttl):
-			slog.Info("Token is not configured to be renewable. Re-attempting login.")
 			return nil
 		}
 	}
@@ -165,4 +131,52 @@ func (c *client) autoRenewToken(ctx context.Context, token *vault.Secret) error 
 			slog.Info("Token successfully renewed", "data", renewal)
 		}
 	}
+}
+
+func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
+	defer cancel()
+
+	var (
+		secret *vault.Secret
+		err    error
+	)
+
+	if c.auth != nil {
+		secret, err = c.vc.Auth().Login(ctx, c.auth)
+	} else {
+		tokenStr, err := c.resolveLocalToken()
+		if err != nil {
+			return nil, err
+		}
+		c.vc.SetToken(tokenStr)
+		secret, err = c.vc.Auth().Token().LookupSelfWithContext(ctx)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	if secret == nil || secret.Auth == nil {
+		return nil, fmt.Errorf("no auth info was returned")
+	}
+
+	return secret, nil
+}
+
+func (c *client) resolveLocalToken() (string, error) {
+	if tokenStr := os.Getenv("VAULT_TOKEN"); tokenStr != "" {
+		return tokenStr, nil
+	}
+
+	if c.cfg.TokenFilePath != "" {
+		data, err := os.ReadFile(c.cfg.TokenFilePath)
+		if err != nil {
+			return "", err
+		}
+		if tokenStr := strings.TrimSpace(string(data)); tokenStr != "" {
+			return tokenStr, nil
+		}
+	}
+
+	return "", fmt.Errorf("no local token found")
 }
