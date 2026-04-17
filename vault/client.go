@@ -106,7 +106,7 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 
 		secret, err := c.vc.Auth().Token().LookupSelfWithContext(lookupCtx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to lookup local token: %w", err)
+			return nil, err
 		}
 
 		return secret, nil
