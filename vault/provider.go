@@ -14,11 +14,7 @@ type Client interface {
 	WatchTokenLifecycle(p watcherParams) error
 }
 
-type ClientConfig struct {
-	TokenFilePath string
-}
-
-type WatcherConfig struct {
+type Config struct {
 	AuthTimeout                     time.Duration
 	AuthRetryBackoffInitialInterval time.Duration
 	AuthRetryBackoffMultiplier      int
@@ -29,7 +25,6 @@ type clientParams struct {
 	fx.In
 	Lc   fx.Lifecycle
 	Auth vault.AuthMethod `optional:"true"`
-	Cfg  ClientConfig
 }
 
 func NewClient(p clientParams) (Client, error) {
@@ -43,7 +38,7 @@ func NewClient(p clientParams) (Client, error) {
 		return nil, err
 	}
 
-	c := client{vc: vc, auth: p.Auth, cfg: p.Cfg}
+	c := client{vc: vc, auth: p.Auth}
 
 	p.Lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {

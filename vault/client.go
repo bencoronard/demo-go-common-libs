@@ -16,7 +16,6 @@ import (
 type client struct {
 	vc   *vault.Client
 	auth vault.AuthMethod
-	cfg  ClientConfig
 }
 
 func (c *client) ReadSecret(ctx context.Context, path string, target any) error {
@@ -49,7 +48,7 @@ func (c *client) ReadSecret(ctx context.Context, path string, target any) error 
 type watcherParams struct {
 	fx.In
 	Lc  fx.Lifecycle
-	Cfg WatcherConfig
+	Cfg Config
 }
 
 func (c *client) WatchTokenLifecycle(p watcherParams) error {
@@ -165,25 +164,24 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 }
 
 func (c *client) resolveLocalToken() error {
-	tokenStr := strings.TrimSpace(os.Getenv("VAULT_TOKEN"))
-
-	if tokenStr != "" {
+	if tokenStr := strings.TrimSpace(os.Getenv("VAULT_TOKEN")); tokenStr != "" {
 		c.vc.SetToken(tokenStr)
 		return nil
 	}
 
-	if c.cfg.TokenFilePath == "" {
-		return fmt.Errorf("no local token found")
+	path := strings.TrimSpace(os.Getenv("VAULT_TOKEN_FILE"))
+	if path == "" {
+		return fmt.Errorf("no vault token found")
 	}
 
-	data, err := os.ReadFile(c.cfg.TokenFilePath)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	tokenStr = strings.TrimSpace(string(data))
+	tokenStr := strings.TrimSpace(string(data))
 	if tokenStr == "" {
-		return fmt.Errorf("token could not be read")
+		return fmt.Errorf("token file at %s was empty", path)
 	}
 
 	c.vc.SetToken(tokenStr)
