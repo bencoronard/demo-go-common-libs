@@ -44,22 +44,14 @@ func NewClient(p Params) (Client, error) {
 
 	c := client{vc: vc, auth: p.Auth, cfg: p.Cfg}
 
-	if p.Auth == nil {
-		return &c, nil
-	}
-
-	authInfo, err := c.vc.Auth().Login(context.Background(), p.Auth)
-	if err != nil {
-		return nil, err
-	}
-
-	watcher, err := c.vc.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: authInfo})
-	if err != nil {
-		return nil, err
-	}
-
-	go watcher.Start()
-	defer watcher.Stop()
+	p.Lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			if _, err := c.authenticate(ctx); err != nil {
+				return err
+			}
+			return nil
+		},
+	})
 
 	return &c, nil
 }
