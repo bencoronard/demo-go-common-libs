@@ -6,13 +6,13 @@ import (
 	"go.uber.org/fx"
 )
 
-type EchoRouterParams struct {
+type echoRouterParams struct {
 	fx.In
 	ErrHandler GlobalErrorHandler
 	Val        validator.Validator `optional:"true"`
 }
 
-func NewEchoRouter(p EchoRouterParams) *echo.Echo {
+func NewEchoRouter(p echoRouterParams) *echo.Echo {
 	e := echo.New()
 	e.HTTPErrorHandler = p.ErrHandler.GetHandler()
 	if p.Val != nil {

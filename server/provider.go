@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-type ServerParams struct {
+type serverParams struct {
 	fx.In
 	Lc fx.Lifecycle
 	Sd fx.Shutdowner
@@ -22,18 +22,18 @@ type HttpServer interface {
 	Configure() error
 }
 
-type HttpServerParams struct {
-	ServerParams
+type httpServerParams struct {
+	serverParams
 	Srv HttpServer
 }
 
-func ServeHttp(p HttpServerParams) error {
+func ServeHttp(p httpServerParams) error {
 	if err := p.Srv.Configure(); err != nil {
 		return err
 	}
 
 	p.Lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(_ context.Context) error {
 			slog.Info(
 				"initiated HTTP server startup",
 				"pid", os.Getpid(),
@@ -62,18 +62,18 @@ type GrpcServer interface {
 	Configure() error
 }
 
-type GrpcServerParams struct {
-	ServerParams
+type grpcServerParams struct {
+	serverParams
 	Srv GrpcServer
 }
 
-func ServeGrpc(p GrpcServerParams) error {
+func ServeGrpc(p grpcServerParams) error {
 	if err := p.Srv.Configure(); err != nil {
 		return err
 	}
 
 	p.Lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(_ context.Context) error {
 			slog.Info(
 				"initiated gRPC server startup",
 				"pid", os.Getpid(),

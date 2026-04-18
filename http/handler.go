@@ -22,17 +22,6 @@ type globalErrorHandler struct {
 	tp *sdktrace.TracerProvider
 }
 
-func (h *globalErrorHandler) extractTraceID(ctx context.Context) string {
-	if h.tp == nil {
-		return ""
-	}
-	span := trace.SpanFromContext(ctx).SpanContext()
-	if span.IsValid() {
-		return span.TraceID().String()
-	}
-	return ""
-}
-
 func (h *globalErrorHandler) GetHandler() func(c *echo.Context, err error) {
 	return func(c *echo.Context, err error) {
 		if resp, err := echo.UnwrapResponse(c.Response()); err == nil && resp.Committed {
@@ -55,7 +44,7 @@ func (h *globalErrorHandler) GetHandler() func(c *echo.Context, err error) {
 		pd := dto.NewProblemDetail(status).
 			WithDetail(detail).
 			With("timestamp", time.Now()).
-			With("trace", h.extractTraceID(c.Request().Context()))
+			With("trace", h.extractTraceId(c.Request().Context()))
 
 		if h.ah != nil {
 			pd, handled = h.ah.Handle(err, pd)
@@ -105,4 +94,15 @@ func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
 		slog.Error("unhandled error", "error", err)
 		return pd
 	}
+}
+
+func (h *globalErrorHandler) extractTraceId(ctx context.Context) string {
+	if h.tp == nil {
+		return ""
+	}
+	span := trace.SpanFromContext(ctx).SpanContext()
+	if span.IsValid() {
+		return span.TraceID().String()
+	}
+	return ""
 }

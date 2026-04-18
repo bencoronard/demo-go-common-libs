@@ -25,19 +25,20 @@ func NewPropagator() propagation.TextMapPropagator {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	)
+
 	otel.SetTextMapPropagator(prop)
 
 	return prop
 }
 
-type Params struct {
+type params struct {
 	fx.In
 	Lc   fx.Lifecycle
 	Prop propagation.TextMapPropagator
 	Res  *resource.Resource
 }
 
-func NewTracerProvider(p Params) (*trace.TracerProvider, error) {
+func NewTracerProvider(p params) (*trace.TracerProvider, error) {
 	exporter, err := otlptracegrpc.New(context.Background())
 	if err != nil {
 		return nil, err
@@ -59,7 +60,7 @@ func NewTracerProvider(p Params) (*trace.TracerProvider, error) {
 	return provider, nil
 }
 
-func NewMeterProvider(p Params) (*metric.MeterProvider, error) {
+func NewMeterProvider(p params) (*metric.MeterProvider, error) {
 	exporter, err := otlpmetricgrpc.New(context.Background())
 	if err != nil {
 		return nil, err
@@ -83,7 +84,7 @@ func NewMeterProvider(p Params) (*metric.MeterProvider, error) {
 	return provider, nil
 }
 
-func NewLoggerProvider(p Params) (*log.LoggerProvider, error) {
+func NewLoggerProvider(p params) (*log.LoggerProvider, error) {
 	exporter, err := otlploggrpc.New(context.Background())
 	if err != nil {
 		return nil, err

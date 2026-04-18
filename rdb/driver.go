@@ -18,12 +18,12 @@ type DriverConfig struct {
 	UseSSL   bool
 }
 
-type DriverParams struct {
+type driverParams struct {
 	fx.In
 	Cfg DriverConfig
 }
 
-func NewPGDriver(p DriverParams) gorm.Dialector {
+func NewPgDriver(p driverParams) gorm.Dialector {
 	sslMode := "disable"
 	if p.Cfg.UseSSL {
 		sslMode = "require"

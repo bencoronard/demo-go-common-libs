@@ -22,14 +22,14 @@ type Config struct {
 	HealthCheckTimeoutPerTask time.Duration
 }
 
-type Params struct {
+type params struct {
 	fx.In
 	Lc  fx.Lifecycle
 	Hc  []HealthChecker
 	Cfg Config
 }
 
-func New(p Params) (Actuator, error) {
+func New(p params) (Actuator, error) {
 	a := &actuator{
 		hc:  p.Hc,
 		cfg: p.Cfg,
@@ -42,7 +42,7 @@ func New(p Params) (Actuator, error) {
 			go a.monitor(ctx)
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
+		OnStop: func(_ context.Context) error {
 			cancel()
 			return nil
 		},

@@ -27,13 +27,13 @@ type GlobalErrorHandler interface {
 	GetHandler() func(c *echo.Context, err error)
 }
 
-type GlobalErrorHandlerParams struct {
+type globalErrorHandlerParams struct {
 	fx.In
 	AppErrHandler  AppErrorHandler          `optional:"true"`
 	TracerProvider *sdktrace.TracerProvider `optional:"true"`
 }
 
-func NewGlobalErrorHandler(p GlobalErrorHandlerParams) GlobalErrorHandler {
+func NewGlobalErrorHandler(p globalErrorHandlerParams) GlobalErrorHandler {
 	return &globalErrorHandler{
 		ah: p.AppErrHandler,
 		tp: p.TracerProvider,
