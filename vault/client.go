@@ -164,19 +164,25 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 }
 
 func (c *client) resolveLocalToken() (string, error) {
-	if tokenStr := os.Getenv("VAULT_TOKEN"); tokenStr != "" {
+	tokenStr := os.Getenv("VAULT_TOKEN")
+
+	if tokenStr != "" {
 		return tokenStr, nil
 	}
 
-	if c.cfg.TokenFilePath != "" {
-		data, err := os.ReadFile(c.cfg.TokenFilePath)
-		if err != nil {
-			return "", err
-		}
-		if tokenStr := strings.TrimSpace(string(data)); tokenStr != "" {
-			return tokenStr, nil
-		}
+	if c.cfg.TokenFilePath == "" {
+		return "", fmt.Errorf("no local token found")
 	}
 
-	return "", fmt.Errorf("no local token found")
+	data, err := os.ReadFile(c.cfg.TokenFilePath)
+	if err != nil {
+		return "", err
+	}
+
+	tokenStr = strings.TrimSpace(string(data))
+	if tokenStr == "" {
+		return "", fmt.Errorf("token could not be read")
+	}
+
+	return tokenStr, nil
 }
