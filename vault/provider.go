@@ -11,27 +11,28 @@ import (
 
 type Client interface {
 	ReadSecret(ctx context.Context, path string, target any) error
-	WatchTokenLifecycle(lc fx.Lifecycle) error
+	WatchTokenLifecycle(p watcherParams) error
 }
 
-type Config struct {
-	ReadTimeout                     time.Duration
+type ClientConfig struct {
+	TokenFilePath string
+}
+
+type WatcherConfig struct {
 	AuthTimeout                     time.Duration
 	AuthRetryBackoffInitialInterval time.Duration
-	AuthRetryBackoffMult            int
+	AuthRetryBackoffMultiplier      int
 	AuthRetryBackoffMaxInterval     time.Duration
-	AuthDefaultTtl                  time.Duration
-	TokenFilePath                   string
 }
 
-type Params struct {
+type clientParams struct {
 	fx.In
 	Lc   fx.Lifecycle
 	Auth vault.AuthMethod `optional:"true"`
-	Cfg  Config
+	Cfg  ClientConfig
 }
 
-func NewClient(p Params) (Client, error) {
+func NewClient(p clientParams) (Client, error) {
 	cfg := vault.DefaultConfig()
 	if cfg.Error != nil {
 		return nil, cfg.Error

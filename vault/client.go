@@ -16,14 +16,11 @@ import (
 type client struct {
 	vc   *vault.Client
 	auth vault.AuthMethod
-	cfg  Config
+	cfg  ClientConfig
 }
 
 func (c *client) ReadSecret(ctx context.Context, path string, target any) error {
-	readCtx, readCancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
-	defer readCancel()
-
-	secret, err := c.vc.Logical().ReadWithContext(readCtx, path)
+	secret, err := c.vc.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -49,28 +46,36 @@ func (c *client) ReadSecret(ctx context.Context, path string, target any) error 
 	return decoder.Decode(data)
 }
 
-func (c *client) WatchTokenLifecycle(lc fx.Lifecycle) error {
+type watcherParams struct {
+	fx.In
+	Lc  fx.Lifecycle
+	Cfg WatcherConfig
+}
+
+func (c *client) WatchTokenLifecycle(p watcherParams) error {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	lc.Append(fx.Hook{
+	p.Lc.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
 			go func() {
-				backoff := c.cfg.AuthRetryBackoffInitialInterval
+				backoff := p.Cfg.AuthRetryBackoffInitialInterval
 				for {
-					token, err := c.authenticate(ctx)
+					authCtx, authCancel := context.WithTimeout(ctx, p.Cfg.AuthTimeout)
+					token, err := c.authenticate(authCtx)
+					authCancel()
 					if err != nil {
 						slog.Error("Failed to authenticate with vault server. Re-attempting login.", "error", err)
 						select {
 						case <-ctx.Done():
 							return
 						case <-time.After(backoff):
-							if backoff < c.cfg.AuthRetryBackoffMaxInterval {
-								backoff *= time.Duration(c.cfg.AuthRetryBackoffMult)
+							if backoff < p.Cfg.AuthRetryBackoffMaxInterval {
+								backoff *= time.Duration(p.Cfg.AuthRetryBackoffMultiplier)
 							}
 							continue
 						}
 					}
-					backoff = c.cfg.AuthRetryBackoffInitialInterval
+					backoff = p.Cfg.AuthRetryBackoffInitialInterval
 					if err := c.autoRenewToken(ctx, token); err != nil {
 						slog.Error("Failed to renew token", "error", err)
 					}
@@ -134,9 +139,6 @@ func (c *client) autoRenewToken(ctx context.Context, token *vault.Secret) error 
 }
 
 func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.cfg.ReadTimeout)
-	defer cancel()
-
 	var (
 		secret *vault.Secret
 		err    error
