@@ -145,17 +145,16 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 	if c.auth != nil {
 		secret, err = c.vc.Auth().Login(ctx, c.auth)
 	} else {
-		tokenStr, err := c.resolveLocalToken()
-		if err != nil {
+		if err := c.resolveLocalToken(); err != nil {
 			return nil, err
 		}
-		c.vc.SetToken(tokenStr)
 		secret, err = c.vc.Auth().Token().LookupSelfWithContext(ctx)
 	}
 
 	if err != nil {
 		return nil, err
 	}
+
 	if secret == nil || secret.Auth == nil {
 		return nil, fmt.Errorf("no auth info was returned")
 	}
@@ -163,26 +162,29 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 	return secret, nil
 }
 
-func (c *client) resolveLocalToken() (string, error) {
-	tokenStr := os.Getenv("VAULT_TOKEN")
+func (c *client) resolveLocalToken() error {
+	tokenStr := strings.TrimSpace(os.Getenv("VAULT_TOKEN"))
 
 	if tokenStr != "" {
-		return tokenStr, nil
+		c.vc.SetToken(tokenStr)
+		return nil
 	}
 
 	if c.cfg.TokenFilePath == "" {
-		return "", fmt.Errorf("no local token found")
+		return fmt.Errorf("no local token found")
 	}
 
 	data, err := os.ReadFile(c.cfg.TokenFilePath)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	tokenStr = strings.TrimSpace(string(data))
 	if tokenStr == "" {
-		return "", fmt.Errorf("token could not be read")
+		return fmt.Errorf("token could not be read")
 	}
 
-	return tokenStr, nil
+	c.vc.SetToken(tokenStr)
+
+	return nil
 }
