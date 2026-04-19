@@ -14,7 +14,7 @@ import (
 type DbConfig struct {
 	MaxOpenConns int
 	MaxIdleConns int
-	ConnMaxTTL   time.Duration
+	ConnTTL      time.Duration
 	IdleTimeout  time.Duration
 }
 
@@ -40,7 +40,7 @@ func NewDb(p dbParams) (*gorm.DB, error) {
 
 	sqlDB.SetMaxOpenConns(p.Cfg.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(p.Cfg.MaxIdleConns)
-	sqlDB.SetConnMaxLifetime(p.Cfg.ConnMaxTTL)
+	sqlDB.SetConnMaxLifetime(p.Cfg.ConnTTL)
 	sqlDB.SetConnMaxIdleTime(p.Cfg.IdleTimeout)
 
 	p.Lc.Append(fx.Hook{
