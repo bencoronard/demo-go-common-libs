@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -91,28 +92,28 @@ func (c *client) WatchTokenLifecycle(p watcherParams) error {
 	return nil
 }
 
-func (c *client) autoRenewToken(ctx context.Context, token *vault.Secret) error {
-	if !token.Auth.Renewable {
-		if token.Auth.LeaseDuration == 0 {
-			slog.Info("Token has no TTL and is not renewable. Waiting for context cancellation.")
+func (c *client) autoRenewToken(ctx context.Context, s *vault.Secret) error {
+	if !isRenewable(s) {
+		ttl := getTTL(s)
+
+		if ttl <= 0 {
+			slog.Info("Token has no expiration. Waiting for context cancellation.")
 			<-ctx.Done()
 			return nil
 		}
 
-		ttl := time.Duration(token.Auth.LeaseDuration) * time.Second
-		ttl = ttl * 2 / 3
-
-		slog.Info("Token is not renewable. Re-attempting login before TTL expiry.", "wait", ttl)
+		wait := ttl * 2 / 3
+		slog.Info("Token is static. Re-logging after grace period.", "wait", wait)
 
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-time.After(ttl):
-			return nil
+		case <-time.After(wait):
 		}
+
+		return nil
 	}
 
-	watcher, err := c.vc.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: token})
+	watcher, err := c.vc.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: s})
 	if err != nil {
 		return err
 	}
@@ -125,11 +126,7 @@ func (c *client) autoRenewToken(ctx context.Context, token *vault.Secret) error 
 		case <-ctx.Done():
 			return nil
 		case err := <-watcher.DoneCh():
-			if err != nil {
-				slog.Info("Failed to renew token. Re-attempting login.", "error", err)
-				return nil
-			}
-			slog.Info("Token can no longer be renewed. Re-attempting login.")
+			slog.Info("Watcher finished. Re-attempting login.", "error", err)
 			return nil
 		case renewal := <-watcher.RenewCh():
 			slog.Info("Token successfully renewed", "data", renewal)
@@ -156,8 +153,14 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 		return nil, err
 	}
 
-	if secret == nil || secret.Auth == nil {
-		return nil, fmt.Errorf("no auth info was returned")
+	if secret == nil {
+		return nil, fmt.Errorf("vault returned an empty response")
+	}
+
+	isTokenLookup := secret.Data != nil && secret.Data["id"] != nil
+
+	if secret.Auth == nil && !isTokenLookup {
+		return nil, fmt.Errorf("no valid authentication or token metadata found")
 	}
 
 	return secret, nil
@@ -187,4 +190,37 @@ func (c *client) resolveLocalToken() error {
 	c.vc.SetToken(tokenStr)
 
 	return nil
+}
+
+func isRenewable(s *vault.Secret) bool {
+	if s == nil {
+		return false
+	}
+	if s.Renewable {
+		return true
+	}
+	if s.Auth != nil && s.Auth.Renewable {
+		return true
+	}
+	return false
+}
+
+func getTTL(s *vault.Secret) time.Duration {
+	if s == nil {
+		return 0
+	}
+	if s.Auth != nil && s.Auth.LeaseDuration > 0 {
+		return time.Duration(s.Auth.LeaseDuration) * time.Second
+	}
+	if s.LeaseDuration > 0 {
+		return time.Duration(s.LeaseDuration) * time.Second
+	}
+	if ttlVal, ok := s.Data["ttl"].(int); ok {
+		return time.Duration(ttlVal) * time.Second
+	}
+	if ttlVal, ok := s.Data["ttl"].(json.Number); ok {
+		t, _ := ttlVal.Int64()
+		return time.Duration(t) * time.Second
+	}
+	return 0
 }
