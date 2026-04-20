@@ -18,14 +18,14 @@ type HealthChecker interface {
 }
 
 type Config struct {
-	HealthCheckTimeout        time.Duration
-	HealthCheckTimeoutPerTask time.Duration
+	HealthCheckInterval time.Duration
+	HealthCheckTimeout  time.Duration
 }
 
 type params struct {
 	fx.In
 	Lc  fx.Lifecycle
-	Hc  []HealthChecker
+	Hc  []HealthChecker `group:"healthcheck"`
 	Cfg Config
 }
 

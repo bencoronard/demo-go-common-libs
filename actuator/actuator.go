@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,19 +24,27 @@ func (a *actuator) Readiness() bool {
 }
 
 func (a *actuator) monitor(ctx context.Context) {
-	jitter := rand.N(3000 * time.Millisecond)
-	ticker := time.NewTicker(a.cfg.HealthCheckTimeout + jitter)
+	ticker := time.NewTicker(a.cfg.HealthCheckInterval)
 	defer ticker.Stop()
 
-	a.healthCheck(ctx)
+	var cancelCurrent context.CancelFunc
 
 	for {
+		if cancelCurrent != nil {
+			cancelCurrent()
+		}
+
+		checkCtx, cancel := context.WithCancel(ctx)
+		cancelCurrent = cancel
+
+		go a.healthCheck(checkCtx)
+
 		select {
-		case <-ticker.C:
-			a.healthCheck(ctx)
 		case <-ctx.Done():
 			slog.Info("stopping health check monitor")
 			return
+		case <-ticker.C:
+			continue
 		}
 	}
 }
@@ -48,7 +55,7 @@ func (a *actuator) healthCheck(ctx context.Context) {
 	var wg sync.WaitGroup
 	for _, hc := range a.hc {
 		wg.Go(func() {
-			pCtx, cancel := context.WithTimeout(ctx, a.cfg.HealthCheckTimeoutPerTask)
+			pCtx, cancel := context.WithTimeout(ctx, a.cfg.HealthCheckInterval)
 			defer cancel()
 			if err := hc.Check(pCtx); err != nil {
 				errCh <- fmt.Errorf("%s: %w", hc.Name(), err)
