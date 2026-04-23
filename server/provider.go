@@ -6,12 +6,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
 )
 
-type serverParams struct {
+type ServerParams struct {
 	fx.In
 	Lc fx.Lifecycle
 	Sd fx.Shutdowner
@@ -22,8 +23,18 @@ type HttpServer interface {
 	Configure() error
 }
 
+type HttpServerConfig struct {
+	Host              string
+	Port              int
+	ReadTimeout       time.Duration
+	ReadHeaderTimeout time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	MaxHeaderBytes    int
+}
+
 type httpServerParams struct {
-	serverParams
+	ServerParams
 	Srv HttpServer
 }
 
@@ -63,7 +74,7 @@ type GrpcServer interface {
 }
 
 type grpcServerParams struct {
-	serverParams
+	ServerParams
 	Srv GrpcServer
 }
 
