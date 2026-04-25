@@ -20,7 +20,7 @@ func (v *validator) Validate(i any) error {
 			return err
 		}
 
-		var data []FieldValidationError
+		data := make([]FieldValidationError, 0, len(ve))
 		for _, fe := range ve {
 			data = append(data, FieldValidationError{
 				Field:   strings.ToLower(fe.Field()),
