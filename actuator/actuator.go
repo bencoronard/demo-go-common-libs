@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -73,4 +74,20 @@ func (a *actuator) healthCheck(ctx context.Context) {
 	}
 
 	a.ready.Store(ready)
+}
+
+func (a *actuator) liveness(w http.ResponseWriter, r *http.Request) {
+	if a.Liveness() {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	w.WriteHeader(http.StatusServiceUnavailable)
+}
+
+func (a *actuator) readiness(w http.ResponseWriter, r *http.Request) {
+	if a.Readiness() {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	w.WriteHeader(http.StatusServiceUnavailable)
 }

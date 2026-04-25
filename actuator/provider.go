@@ -2,6 +2,11 @@ package actuator
 
 import (
 	"context"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"go.uber.org/fx"
@@ -18,6 +23,8 @@ type HealthChecker interface {
 }
 
 type Config struct {
+	Host                string
+	Port                int
 	HealthCheckInterval time.Duration
 	HealthCheckTimeout  time.Duration
 }
@@ -25,6 +32,7 @@ type Config struct {
 type params struct {
 	fx.In
 	Lc  fx.Lifecycle
+	Sd  fx.Shutdowner
 	Hc  []HealthChecker `group:"healthcheck"`
 	Cfg Config
 }
@@ -35,16 +43,42 @@ func New(p params) (Actuator, error) {
 		cfg: p.Cfg,
 	}
 
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /actuator/liveness", a.liveness)
+	mux.HandleFunc("GET /actuator/readiness", a.readiness)
+
+	server := &http.Server{
+		Addr:              net.JoinHostPort(p.Cfg.Host, strconv.Itoa(p.Cfg.Port)),
+		Handler:           mux,
+		ReadTimeout:       2 * time.Second,
+		ReadHeaderTimeout: 1 * time.Second,
+		WriteTimeout:      2 * time.Second,
+		IdleTimeout:       10 * time.Second,
+		MaxHeaderBytes:    4 << 10,
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	p.Lc.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
+			slog.Info(
+				"initiated actuator server startup",
+				"pid", os.Getpid(),
+				"addr", server.Addr,
+			)
 			go a.monitor(ctx)
+			go func() {
+				if err := server.ListenAndServe(); err != http.ErrServerClosed {
+					slog.Error("failed to start actuator server", "error", err)
+					p.Sd.Shutdown()
+				}
+			}()
 			return nil
 		},
-		OnStop: func(_ context.Context) error {
+		OnStop: func(ctx context.Context) error {
+			slog.Info("initiated actuator server shutdown")
 			cancel()
-			return nil
+			return server.Shutdown(ctx)
 		},
 	})
 
