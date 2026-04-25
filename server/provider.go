@@ -8,14 +8,16 @@ import (
 	"os"
 	"time"
 
+	"github.com/bencoronard/demo-go-common-libs/actuator"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
 )
 
 type ServerParams struct {
 	fx.In
-	Lc fx.Lifecycle
-	Sd fx.Shutdowner
+	Lc  fx.Lifecycle
+	Sd  fx.Shutdowner
+	Act actuator.Actuator `optional:"true"`
 }
 
 type HttpServer interface {
