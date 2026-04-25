@@ -1,6 +1,6 @@
 package validator
 
 type FieldValidationError struct {
-	Field   string
-	Message string
+	Field   string `json:"field"`
+	Message string `json:"message"`
 }

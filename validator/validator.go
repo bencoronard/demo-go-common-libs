@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 
@@ -13,7 +14,23 @@ type validator struct {
 
 func (v *validator) Validate(i any) error {
 	if err := v.validator.Struct(i); err != nil {
-		return err
+		var ve val.ValidationErrors
+
+		if !errors.As(err, &ve) {
+			return err
+		}
+
+		var data []FieldValidationError
+		for _, fe := range ve {
+			data = append(data, FieldValidationError{
+				Field:   strings.ToLower(fe.Field()),
+				Message: fe.Tag(),
+			})
+		}
+
+		return &validationError{
+			errors: data,
+		}
 	}
 	return nil
 }

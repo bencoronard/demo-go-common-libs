@@ -10,8 +10,7 @@ import (
 	"github.com/bencoronard/demo-go-common-libs/auth"
 	"github.com/bencoronard/demo-go-common-libs/dto"
 	"github.com/bencoronard/demo-go-common-libs/jwt"
-	xvalidator "github.com/bencoronard/demo-go-common-libs/validator"
-	"github.com/go-playground/validator/v10"
+	"github.com/bencoronard/demo-go-common-libs/validator"
 	"github.com/labstack/echo/v5"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -62,20 +61,13 @@ func (h *globalErrorHandler) GetHandler() func(c *echo.Context, err error) {
 }
 
 func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
-	var ve validator.ValidationErrors
+	var ve validator.ValidationError
 	switch {
 	case errors.As(err, &ve):
-		var validationDetails []xvalidator.FieldValidationError
-		for _, fe := range ve {
-			validationDetails = append(validationDetails, xvalidator.FieldValidationError{
-				Field:   fe.Field(),
-				Message: fe.Error(),
-			})
-		}
 		return pd.
 			WithStatus(http.StatusBadRequest).
-			WithDetail("Input data did not pass validations").
-			With("errors", validationDetails)
+			WithDetail(ve.Error()).
+			With("errors", ve.Data())
 	case errors.Is(err, auth.ErrInsufficientPermission):
 		return pd.
 			WithStatus(http.StatusForbidden).
