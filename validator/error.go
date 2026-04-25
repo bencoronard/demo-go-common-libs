@@ -10,7 +10,7 @@ type validationError struct {
 }
 
 func (ve *validationError) Error() string {
-	return "data did not pass validations"
+	return "invalid input"
 }
 
 func (ve *validationError) Data() []FieldValidationError {
