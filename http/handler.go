@@ -31,13 +31,11 @@ func (h *globalErrorHandler) GetHandler() func(c *echo.Context, err error) {
 		detail := "Unhandled error at server side"
 		handled := false
 
-		var sc echo.HTTPStatusCoder
-		if errors.As(err, &sc) {
-			if tmp := sc.StatusCode(); tmp != 0 {
-				status = tmp
-				detail = err.Error()
-				handled = true
-			}
+		sc, ok := errors.AsType[*echo.HTTPError](err)
+		if ok && sc.StatusCode() != 0 {
+			status = sc.StatusCode()
+			detail = err.Error()
+			handled = true
 		}
 
 		pd := dto.NewProblemDetail(status).

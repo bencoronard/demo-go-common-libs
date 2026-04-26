@@ -14,9 +14,8 @@ type validator struct {
 
 func (v *validator) Validate(i any) error {
 	if err := v.validator.Struct(i); err != nil {
-		var ve val.ValidationErrors
-
-		if !errors.As(err, &ve) {
+		ve, ok := errors.AsType[val.ValidationErrors](err)
+		if !ok {
 			return err
 		}
 
