@@ -1,6 +1,15 @@
 package utility
 
 func CastToTypeOrZero[T any](v any) T {
-	t, _ := v.(T)
+	var zero T
+	if v == nil {
+		return zero
+	}
+
+	t, ok := v.(T)
+	if !ok {
+		return zero
+	}
+
 	return t
 }
