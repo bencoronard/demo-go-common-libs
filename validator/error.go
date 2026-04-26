@@ -1,18 +1,9 @@
 package validator
 
-type ValidationError interface {
-	Data() []FieldValidationError
-	Error() string
+type ValidationError struct {
+	Errors []FieldValidationError
 }
 
-type validationError struct {
-	errors []FieldValidationError
-}
-
-func (ve *validationError) Error() string {
+func (ve *ValidationError) Error() string {
 	return "invalid input"
-}
-
-func (ve *validationError) Data() []FieldValidationError {
-	return ve.errors
 }

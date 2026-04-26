@@ -13,33 +13,35 @@ type validator struct {
 }
 
 func (v *validator) Validate(i any) error {
-	if err := v.validator.Struct(i); err != nil {
-		ve, ok := errors.AsType[val.ValidationErrors](err)
-		if !ok {
-			return err
-		}
-
-		data := make([]FieldValidationError, 0, len(ve))
-		for _, fe := range ve {
-			data = append(data, FieldValidationError{
-				Field:   strings.ToLower(fe.Field()),
-				Message: fe.Tag(),
-			})
-		}
-
-		return &validationError{
-			errors: data,
-		}
+	err := v.validator.Struct(i)
+	if err == nil {
+		return nil
 	}
-	return nil
+
+	ve, ok := errors.AsType[val.ValidationErrors](err)
+	if !ok {
+		return err
+	}
+
+	s := make([]FieldValidationError, 0, len(ve))
+	for _, fe := range ve {
+		s = append(s, FieldValidationError{
+			Field:   strings.ToLower(fe.Field()),
+			Message: fe.Tag(),
+		})
+	}
+
+	return &ValidationError{Errors: s}
 }
 
 func notblank(fl val.FieldLevel) bool {
-	if fl.Field().Kind() == reflect.Pointer {
-		if fl.Field().IsNil() {
-			return false
-		}
-		return len(strings.TrimSpace(fl.Field().Elem().String())) > 0
+	if fl.Field().Kind() != reflect.Pointer {
+		return len(strings.TrimSpace(fl.Field().String())) > 0
 	}
-	return len(strings.TrimSpace(fl.Field().String())) > 0
+
+	if fl.Field().IsNil() {
+		return false
+	}
+
+	return len(strings.TrimSpace(fl.Field().Elem().String())) > 0
 }

@@ -13,7 +13,5 @@ func New() (Validator, error) {
 
 	v.RegisterValidation("notblank", notblank)
 
-	return &validator{
-		validator: v,
-	}, nil
+	return &validator{validator: v}, nil
 }

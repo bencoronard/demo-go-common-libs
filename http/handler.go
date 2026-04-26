@@ -59,13 +59,15 @@ func (h *globalErrorHandler) GetHandler() func(c *echo.Context, err error) {
 }
 
 func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
-	var ve validator.ValidationError
-	switch {
-	case errors.As(err, &ve):
+	ve, ok := errors.AsType[*validator.ValidationError](err)
+	if ok {
 		return pd.
 			WithStatus(http.StatusBadRequest).
 			WithDetail(ve.Error()).
-			With("errors", ve.Data())
+			With("errors", ve.Errors)
+	}
+
+	switch {
 	case errors.Is(err, auth.ErrInsufficientPermission):
 		return pd.
 			WithStatus(http.StatusForbidden).
