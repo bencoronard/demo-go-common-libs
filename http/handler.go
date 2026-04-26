@@ -31,8 +31,8 @@ func (h *globalErrorHandler) GetHandler() func(c *echo.Context, err error) {
 		detail := "Unhandled error at server side"
 		handled := false
 
-		sc, ok := errors.AsType[*echo.HTTPError](err)
-		if ok && sc.StatusCode() != 0 {
+		var sc echo.HTTPStatusCoder
+		if errors.As(err, &sc) && sc.StatusCode() != 0 {
 			status = sc.StatusCode()
 			detail = err.Error()
 			handled = true
