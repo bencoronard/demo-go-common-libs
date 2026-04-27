@@ -1,10 +1,16 @@
 package logger
 
-import "log/slog"
+import (
+	"log/slog"
+
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+)
 
 func New() (*slog.Logger, error) {
 
-	logger := slog.Default()
+	handler := otelslog.NewHandler("")
+
+	logger := slog.New(handler)
 
 	slog.SetDefault(logger)
 
