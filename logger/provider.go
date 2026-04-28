@@ -14,7 +14,6 @@ type otelLoggerParams struct {
 }
 
 func NewOtelLogger(p otelLoggerParams) (*slog.Logger, error) {
-
 	handler := otelslog.NewHandler(
 		"",
 		otelslog.WithLoggerProvider(p.Lp),
