@@ -75,6 +75,7 @@ func accessLogMiddleware(logger *slog.Logger, enabled bool) echo.MiddlewareFunc 
 		return nil
 	}
 	return middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		HandleError:     true,
 		LogLatency:      true,
 		LogProtocol:     true,
 		LogRemoteIP:     true,
@@ -83,7 +84,6 @@ func accessLogMiddleware(logger *slog.Logger, enabled bool) echo.MiddlewareFunc 
 		LogStatus:       true,
 		LogResponseSize: true,
 		LogUserAgent:    true,
-
 		LogValuesFunc: func(c *echo.Context, v middleware.RequestLoggerValues) error {
 			attrs := []slog.Attr{
 				slog.String("protocol", v.Protocol),
@@ -98,13 +98,13 @@ func accessLogMiddleware(logger *slog.Logger, enabled bool) echo.MiddlewareFunc 
 
 			level := slog.LevelInfo
 			switch {
+			case v.Status >= 400:
+				level = slog.LevelWarn
+			case v.Status >= 500:
+				level = slog.LevelError
 			case v.Error != nil:
 				level = slog.LevelError
 				attrs = append(attrs, slog.Any("error", v.Error))
-			case v.Status >= 500:
-				level = slog.LevelError
-			case v.Status >= 400:
-				level = slog.LevelWarn
 			}
 
 			logger.LogAttrs(c.Request().Context(), level, "request", attrs...)
