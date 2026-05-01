@@ -1,10 +1,8 @@
 package http
 
 import (
-	"cmp"
 	"log/slog"
 	"slices"
-	"strings"
 
 	"github.com/bencoronard/demo-go-common-libs/validator"
 	echootel "github.com/labstack/echo-opentelemetry"
@@ -16,14 +14,13 @@ import (
 	"go.uber.org/fx"
 )
 
-type RouterConfig struct {
-	ContextPath     string
+type Config struct {
 	EnableAccessLog bool
 }
 
 type echoRouterParams struct {
 	fx.In
-	Cfg        RouterConfig
+	Cfg        Config
 	ErrHandler GlobalErrorHandler
 	Logger     *slog.Logger                  `optional:"true"`
 	Val        validator.Validator           `optional:"true"`
@@ -45,17 +42,12 @@ func NewEchoRouter(p echoRouterParams) *echo.Echo {
 		e.Validator = p.Val
 	}
 
-	preMiddlewares := []echo.MiddlewareFunc{
-		contextPathMiddleware(p.Cfg.ContextPath),
-	}
-
 	middlewares := []echo.MiddlewareFunc{
 		middleware.Recover(),
 		otelMiddleware(p.Pp, p.Tp, p.Mp),
 		accessLogMiddleware(p.Logger, p.Cfg.EnableAccessLog),
 	}
 
-	e.Pre(compact(preMiddlewares)...)
 	e.Use(compact(middlewares)...)
 
 	return e
@@ -65,20 +57,6 @@ func compact(mws []echo.MiddlewareFunc) []echo.MiddlewareFunc {
 	return slices.DeleteFunc(mws, func(mw echo.MiddlewareFunc) bool {
 		return mw == nil
 	})
-}
-
-func contextPathMiddleware(contextPath string) echo.MiddlewareFunc {
-	if contextPath == "" {
-		return nil
-	}
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) error {
-			if path, ok := strings.CutPrefix(c.Request().URL.Path, contextPath); ok {
-				c.Request().URL.Path = cmp.Or(path, "/")
-			}
-			return next(c)
-		}
-	}
 }
 
 func otelMiddleware(pp propagation.TextMapPropagator, tp *trace.TracerProvider, mp *metric.MeterProvider) echo.MiddlewareFunc {
