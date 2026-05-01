@@ -96,18 +96,12 @@ func accessLogMiddleware(logger *slog.Logger, enabled bool) echo.MiddlewareFunc 
 				slog.String("user_agent", v.UserAgent),
 			}
 
-			level := slog.LevelInfo
-			switch {
-			case v.Status >= 400:
-				level = slog.LevelWarn
-			case v.Status >= 500:
-				level = slog.LevelError
-			case v.Error != nil:
-				level = slog.LevelError
+			if v.Error != nil {
 				attrs = append(attrs, slog.Any("error", v.Error))
 			}
 
-			logger.LogAttrs(c.Request().Context(), level, "request", attrs...)
+			logger.LogAttrs(c.Request().Context(), slog.LevelInfo, "ACCESS", attrs...)
+
 			return nil
 		},
 	})
