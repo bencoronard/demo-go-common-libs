@@ -2,8 +2,6 @@ package actuator
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -11,9 +9,9 @@ import (
 )
 
 type actuator struct {
-	ready atomic.Bool
-	hc    []HealthChecker
-	cfg   Config
+	ready          atomic.Bool
+	healthCheckers []HealthChecker
+	config         Config
 }
 
 func (a *actuator) Liveness() bool {
@@ -25,7 +23,7 @@ func (a *actuator) Readiness() bool {
 }
 
 func (a *actuator) monitor(ctx context.Context) {
-	ticker := time.NewTicker(a.cfg.HealthCheckInterval)
+	ticker := time.NewTicker(a.config.HealthCheckInterval)
 	defer ticker.Stop()
 
 	var cancelCurrent context.CancelFunc
@@ -42,7 +40,6 @@ func (a *actuator) monitor(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
-			slog.Info("stopping health check monitor")
 			return
 		case <-ticker.C:
 			continue
@@ -51,15 +48,15 @@ func (a *actuator) monitor(ctx context.Context) {
 }
 
 func (a *actuator) healthCheck(ctx context.Context) {
-	errCh := make(chan error, len(a.hc))
+	errCh := make(chan error, len(a.healthCheckers))
 
 	var wg sync.WaitGroup
-	for _, hc := range a.hc {
+	for _, hc := range a.healthCheckers {
 		wg.Go(func() {
-			pCtx, cancel := context.WithTimeout(ctx, a.cfg.HealthCheckInterval)
+			checkCtx, cancel := context.WithTimeout(ctx, a.config.HealthCheckInterval)
 			defer cancel()
-			if err := hc.Check(pCtx); err != nil {
-				errCh <- fmt.Errorf("%s: %w", hc.Name(), err)
+			if err := hc.Check(checkCtx); err != nil {
+				errCh <- err
 			}
 		})
 	}
@@ -68,8 +65,7 @@ func (a *actuator) healthCheck(ctx context.Context) {
 	close(errCh)
 
 	ready := true
-	for err := range errCh {
-		slog.Error("health check failed", "error", err)
+	for range errCh {
 		ready = false
 	}
 

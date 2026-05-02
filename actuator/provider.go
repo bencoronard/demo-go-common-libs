@@ -2,10 +2,8 @@ package actuator
 
 import (
 	"context"
-	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -31,20 +29,20 @@ type Config struct {
 
 type params struct {
 	fx.In
-	Lc  fx.Lifecycle
-	Sd  fx.Shutdowner
-	Hc  []HealthChecker `group:"healthcheck"`
-	Cfg Config
+	Lifecycle      fx.Lifecycle
+	Shutdowner     fx.Shutdowner
+	HealthCheckers []HealthChecker `group:"healthcheck"`
+	Config         Config
 }
 
 func New(p params) (Actuator, error) {
 	a := &actuator{
-		hc:  p.Hc,
-		cfg: p.Cfg,
+		healthCheckers: p.HealthCheckers,
+		config:         p.Config,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	p.Lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
 			go a.monitor(ctx)
 			return nil
@@ -55,13 +53,13 @@ func New(p params) (Actuator, error) {
 		},
 	})
 
-	if p.Cfg.Host != "" && p.Cfg.Port != 0 {
+	if p.Config.Host != "" && p.Config.Port != 0 {
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /actuator/liveness", a.liveness)
 		mux.HandleFunc("GET /actuator/readiness", a.readiness)
 
 		server := &http.Server{
-			Addr:              net.JoinHostPort(p.Cfg.Host, strconv.Itoa(p.Cfg.Port)),
+			Addr:              net.JoinHostPort(p.Config.Host, strconv.Itoa(p.Config.Port)),
 			Handler:           mux,
 			ReadTimeout:       2 * time.Second,
 			ReadHeaderTimeout: 1 * time.Second,
@@ -70,23 +68,16 @@ func New(p params) (Actuator, error) {
 			MaxHeaderBytes:    4 << 10,
 		}
 
-		p.Lc.Append(fx.Hook{
+		p.Lifecycle.Append(fx.Hook{
 			OnStart: func(_ context.Context) error {
-				slog.Info(
-					"initiated actuator server startup",
-					"pid", os.Getpid(),
-					"addr", server.Addr,
-				)
 				go func() {
 					if err := server.ListenAndServe(); err != http.ErrServerClosed {
-						slog.Error("failed to start actuator server", "error", err)
-						p.Sd.Shutdown()
+						p.Shutdowner.Shutdown()
 					}
 				}()
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				slog.Info("initiated actuator server shutdown")
 				return server.Shutdown(ctx)
 			},
 		})
