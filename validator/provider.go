@@ -11,7 +11,9 @@ type Validator interface {
 func New() (Validator, error) {
 	v := val.New(val.WithRequiredStructEnabled())
 
-	v.RegisterValidation("notblank", notblank)
+	if err := v.RegisterValidation("notblank", notblank); err != nil {
+		return nil, err
+	}
 
 	return &validator{validator: v}, nil
 }
