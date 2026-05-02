@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type DbConfig struct {
+type DBConfig struct {
 	MaxOpenConns int
 	MaxIdleConns int
 	ConnTTL      time.Duration
@@ -20,13 +20,13 @@ type DbConfig struct {
 
 type dbParams struct {
 	fx.In
-	Lc  fx.Lifecycle
-	Dl  gorm.Dialector
-	Cfg DbConfig
+	Lifecycle fx.Lifecycle
+	Dialector gorm.Dialector
+	Config    DBConfig
 }
 
-func NewDb(p dbParams) (*gorm.DB, error) {
-	db, err := gorm.Open(p.Dl, &gorm.Config{
+func NewDB(p dbParams) (*gorm.DB, error) {
+	db, err := gorm.Open(p.Dialector, &gorm.Config{
 		SkipDefaultTransaction: true,
 	})
 	if err != nil {
@@ -38,12 +38,12 @@ func NewDb(p dbParams) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	sqlDB.SetMaxOpenConns(p.Cfg.MaxOpenConns)
-	sqlDB.SetMaxIdleConns(p.Cfg.MaxIdleConns)
-	sqlDB.SetConnMaxLifetime(p.Cfg.ConnTTL)
-	sqlDB.SetConnMaxIdleTime(p.Cfg.IdleTimeout)
+	sqlDB.SetMaxOpenConns(p.Config.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(p.Config.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(p.Config.ConnTTL)
+	sqlDB.SetConnMaxIdleTime(p.Config.IdleTimeout)
 
-	p.Lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			return sqlDB.PingContext(ctx)
 		},
@@ -55,25 +55,12 @@ func NewDb(p dbParams) (*gorm.DB, error) {
 	return db, nil
 }
 
-type TransactionManager interface {
-	Transactional(ctx context.Context, fn func(tx *gorm.DB) error) error
-}
-
-type tmParams struct {
-	fx.In
-	DB *gorm.DB
-}
-
-func NewTransactionManager(p tmParams) (TransactionManager, error) {
-	return &transactionManager{db: p.DB}, nil
-}
-
 type healthCheckerParams struct {
 	fx.In
 	DB *gorm.DB
 }
 
-func NewDbHealthChecker(p healthCheckerParams) (actuator.HealthChecker, error) {
+func NewHealthChecker(p healthCheckerParams) (actuator.HealthChecker, error) {
 	sqlDB, err := p.DB.DB()
 	if err != nil {
 		return nil, err

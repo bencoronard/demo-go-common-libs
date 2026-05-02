@@ -10,10 +10,10 @@ type healthChecker struct {
 	db   *sql.DB
 }
 
-func (d *healthChecker) Name() string {
-	return d.name
+func (h *healthChecker) Name() string {
+	return h.name
 }
 
-func (d *healthChecker) Check(ctx context.Context) error {
-	return d.db.PingContext(ctx)
+func (h *healthChecker) Check(ctx context.Context) error {
+	return h.db.PingContext(ctx)
 }

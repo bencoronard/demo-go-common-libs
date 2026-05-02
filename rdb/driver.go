@@ -20,22 +20,22 @@ type DriverConfig struct {
 
 type driverParams struct {
 	fx.In
-	Cfg DriverConfig
+	Config DriverConfig
 }
 
 func NewPgDriver(p driverParams) gorm.Dialector {
 	sslMode := "disable"
-	if p.Cfg.UseSSL {
+	if p.Config.UseSSL {
 		sslMode = "require"
 	}
 
 	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		p.Cfg.Host,
-		p.Cfg.Port,
-		p.Cfg.User,
-		p.Cfg.Password,
-		p.Cfg.DBName,
+		p.Config.Host,
+		p.Config.Port,
+		p.Config.User,
+		p.Config.Password,
+		p.Config.DBName,
 		sslMode,
 	)
 
