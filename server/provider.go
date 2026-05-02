@@ -2,10 +2,8 @@ package server
 
 import (
 	"context"
-	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"go.uber.org/fx"
@@ -14,16 +12,16 @@ import (
 
 type ServerParams struct {
 	fx.In
-	Lc fx.Lifecycle
-	Sd fx.Shutdowner
+	Lifecycle  fx.Lifecycle
+	Shutdowner fx.Shutdowner
 }
 
-type HttpServer interface {
+type HTTPServer interface {
 	Instance() *http.Server
 	Configure() error
 }
 
-type HttpServerConfig struct {
+type HTTPServerConfig struct {
 	Host              string
 	Port              int
 	ReadTimeout       time.Duration
@@ -35,39 +33,32 @@ type HttpServerConfig struct {
 
 type httpServerParams struct {
 	ServerParams
-	Srv HttpServer
+	Server HTTPServer
 }
 
-func ServeHttp(p httpServerParams) error {
-	if err := p.Srv.Configure(); err != nil {
+func ServeHTTP(p httpServerParams) error {
+	if err := p.Server.Configure(); err != nil {
 		return err
 	}
 
-	p.Lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
-			slog.Info(
-				"initiated HTTP server startup",
-				"pid", os.Getpid(),
-				"addr", p.Srv.Instance().Addr,
-			)
 			go func() {
-				if err := p.Srv.Instance().ListenAndServe(); err != http.ErrServerClosed {
-					slog.Error("failed to start HTTP server", "error", err)
-					p.Sd.Shutdown()
+				if err := p.Server.Instance().ListenAndServe(); err != http.ErrServerClosed {
+					p.Shutdowner.Shutdown()
 				}
 			}()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			slog.Info("initiated HTTP server shutdown")
-			return p.Srv.Instance().Shutdown(ctx)
+			return p.Server.Instance().Shutdown(ctx)
 		},
 	})
 
 	return nil
 }
 
-type GrpcServer interface {
+type GRPCServer interface {
 	Instance() *grpc.Server
 	Listener() net.Listener
 	Configure() error
@@ -75,41 +66,34 @@ type GrpcServer interface {
 
 type grpcServerParams struct {
 	ServerParams
-	Srv GrpcServer
+	Server GRPCServer
 }
 
-func ServeGrpc(p grpcServerParams) error {
-	if err := p.Srv.Configure(); err != nil {
+func ServeGRPC(p grpcServerParams) error {
+	if err := p.Server.Configure(); err != nil {
 		return err
 	}
 
-	p.Lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
-			slog.Info(
-				"initiated gRPC server startup",
-				"pid", os.Getpid(),
-				"addr", p.Srv.Listener().Addr(),
-			)
 			go func() {
-				if err := p.Srv.Instance().Serve(p.Srv.Listener()); err != nil {
-					slog.Error("failed to start gRPC server", "error", err)
-					p.Sd.Shutdown()
+				if err := p.Server.Instance().Serve(p.Server.Listener()); err != nil {
+					p.Shutdowner.Shutdown()
 				}
 			}()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			slog.Info("initiated gRPC server shutdown")
 			stopped := make(chan struct{})
 			go func() {
-				p.Srv.Instance().GracefulStop()
+				p.Server.Instance().GracefulStop()
 				close(stopped)
 			}()
 			select {
 			case <-stopped:
 				return nil
 			case <-ctx.Done():
-				p.Srv.Instance().Stop()
+				p.Server.Instance().Stop()
 				return nil
 			}
 		},
