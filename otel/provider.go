@@ -33,8 +33,8 @@ func NewPropagator() propagation.TextMapPropagator {
 
 type params struct {
 	fx.In
-	Lc  fx.Lifecycle
-	Res *resource.Resource
+	Lifecycle fx.Lifecycle
+	Resource  *resource.Resource
 }
 
 func NewTracerProvider(p params) (*trace.TracerProvider, error) {
@@ -44,13 +44,13 @@ func NewTracerProvider(p params) (*trace.TracerProvider, error) {
 	}
 
 	provider := trace.NewTracerProvider(
-		trace.WithResource(p.Res),
+		trace.WithResource(p.Resource),
 		trace.WithBatcher(exporter),
 	)
 
 	otel.SetTracerProvider(provider)
 
-	p.Lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
 			return provider.Shutdown(ctx)
 		},
@@ -68,13 +68,13 @@ func NewMeterProvider(p params) (*metric.MeterProvider, error) {
 	reader := metric.NewPeriodicReader(exporter)
 
 	provider := metric.NewMeterProvider(
-		metric.WithResource(p.Res),
+		metric.WithResource(p.Resource),
 		metric.WithReader(reader),
 	)
 
 	otel.SetMeterProvider(provider)
 
-	p.Lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
 			return provider.Shutdown(ctx)
 		},
@@ -92,13 +92,13 @@ func NewLoggerProvider(p params) (*log.LoggerProvider, error) {
 	processor := log.NewBatchProcessor(exporter)
 
 	provider := log.NewLoggerProvider(
-		log.WithResource(p.Res),
+		log.WithResource(p.Resource),
 		log.WithProcessor(processor),
 	)
 
 	global.SetLoggerProvider(provider)
 
-	p.Lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
 			return provider.Shutdown(ctx)
 		},
