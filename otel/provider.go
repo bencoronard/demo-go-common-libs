@@ -33,9 +33,8 @@ func NewPropagator() propagation.TextMapPropagator {
 
 type params struct {
 	fx.In
-	Lc   fx.Lifecycle
-	Prop propagation.TextMapPropagator
-	Res  *resource.Resource
+	Lc  fx.Lifecycle
+	Res *resource.Resource
 }
 
 func NewTracerProvider(p params) (*trace.TracerProvider, error) {
