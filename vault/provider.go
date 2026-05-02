@@ -21,13 +21,13 @@ type Config struct {
 	AuthRetryBackoffMaxInterval     time.Duration
 }
 
-type clientParams struct {
+type params struct {
 	fx.In
-	Lc   fx.Lifecycle
-	Auth vault.AuthMethod `optional:"true"`
+	Lifecycle fx.Lifecycle
+	Auth      vault.AuthMethod `optional:"true"`
 }
 
-func NewClient(p clientParams) (Client, error) {
+func NewClient(p params) (Client, error) {
 	cfg := vault.DefaultConfig()
 	if cfg.Error != nil {
 		return nil, cfg.Error
@@ -38,9 +38,9 @@ func NewClient(p clientParams) (Client, error) {
 		return nil, err
 	}
 
-	c := client{vc: vc, auth: p.Auth}
+	c := client{client: vc, auth: p.Auth}
 
-	p.Lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if _, err := c.authenticate(ctx); err != nil {
 				return err

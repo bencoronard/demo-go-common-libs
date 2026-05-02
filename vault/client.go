@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -15,12 +14,12 @@ import (
 )
 
 type client struct {
-	vc   *vault.Client
-	auth vault.AuthMethod
+	client *vault.Client
+	auth   vault.AuthMethod
 }
 
 func (c *client) ReadSecret(ctx context.Context, path string, target any) error {
-	secret, err := c.vc.Logical().ReadWithContext(ctx, path)
+	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -48,37 +47,34 @@ func (c *client) ReadSecret(ctx context.Context, path string, target any) error 
 
 type watcherParams struct {
 	fx.In
-	Lc  fx.Lifecycle
-	Cfg Config
+	Lifecycle fx.Lifecycle
+	Config    Config
 }
 
 func (c *client) WatchTokenLifecycle(p watcherParams) error {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	p.Lc.Append(fx.Hook{
+	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
 			go func() {
-				backoff := p.Cfg.AuthRetryBackoffInitialInterval
+				backoff := p.Config.AuthRetryBackoffInitialInterval
 				for {
-					authCtx, authCancel := context.WithTimeout(ctx, p.Cfg.AuthTimeout)
+					authCtx, authCancel := context.WithTimeout(ctx, p.Config.AuthTimeout)
 					token, err := c.authenticate(authCtx)
 					authCancel()
 					if err != nil {
-						slog.Error("Failed to authenticate with vault server. Re-attempting login.", "error", err)
 						select {
 						case <-ctx.Done():
 							return
 						case <-time.After(backoff):
-							if backoff < p.Cfg.AuthRetryBackoffMaxInterval {
-								backoff *= time.Duration(p.Cfg.AuthRetryBackoffMultiplier)
+							if backoff < p.Config.AuthRetryBackoffMaxInterval {
+								backoff *= time.Duration(p.Config.AuthRetryBackoffMultiplier)
 							}
 							continue
 						}
 					}
-					backoff = p.Cfg.AuthRetryBackoffInitialInterval
-					if err := c.autoRenewToken(ctx, token); err != nil {
-						slog.Error("Failed to renew token", "error", err)
-					}
+					backoff = p.Config.AuthRetryBackoffInitialInterval
+					c.autoRenewToken(ctx, token)
 				}
 			}()
 			return nil
@@ -95,25 +91,19 @@ func (c *client) WatchTokenLifecycle(p watcherParams) error {
 func (c *client) autoRenewToken(ctx context.Context, s *vault.Secret) error {
 	if !isRenewable(s) {
 		ttl := getTTL(s)
-
 		if ttl <= 0 {
-			slog.Info("Token has no expiration. Waiting for context cancellation.")
 			<-ctx.Done()
 			return nil
 		}
-
 		wait := ttl * 2 / 3
-		slog.Info("Token is static. Re-logging after grace period.", "wait", wait)
-
 		select {
 		case <-ctx.Done():
 		case <-time.After(wait):
 		}
-
 		return nil
 	}
 
-	watcher, err := c.vc.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: s})
+	watcher, err := c.client.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: s})
 	if err != nil {
 		return err
 	}
@@ -125,11 +115,9 @@ func (c *client) autoRenewToken(ctx context.Context, s *vault.Secret) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case err := <-watcher.DoneCh():
-			slog.Info("Watcher finished. Re-attempting login.", "error", err)
+		case <-watcher.DoneCh():
 			return nil
-		case renewal := <-watcher.RenewCh():
-			slog.Info("Token successfully renewed", "data", renewal)
+		case <-watcher.RenewCh():
 		}
 	}
 }
@@ -141,12 +129,12 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 	)
 
 	if c.auth != nil {
-		secret, err = c.vc.Auth().Login(ctx, c.auth)
+		secret, err = c.client.Auth().Login(ctx, c.auth)
 	} else {
 		if err := c.resolveLocalToken(); err != nil {
 			return nil, err
 		}
-		secret, err = c.vc.Auth().Token().LookupSelfWithContext(ctx)
+		secret, err = c.client.Auth().Token().LookupSelfWithContext(ctx)
 	}
 
 	if err != nil {
@@ -168,7 +156,7 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 
 func (c *client) resolveLocalToken() error {
 	if tokenStr := strings.TrimSpace(os.Getenv("VAULT_TOKEN")); tokenStr != "" {
-		c.vc.SetToken(tokenStr)
+		c.client.SetToken(tokenStr)
 		return nil
 	}
 
@@ -187,7 +175,7 @@ func (c *client) resolveLocalToken() error {
 		return fmt.Errorf("token file at %s was empty", path)
 	}
 
-	c.vc.SetToken(tokenStr)
+	c.client.SetToken(tokenStr)
 
 	return nil
 }
