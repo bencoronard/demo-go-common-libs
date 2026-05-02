@@ -11,11 +11,11 @@ import (
 )
 
 type unsignedIssuer struct {
-	iss string
+	issuer string
 }
 
 func (i *unsignedIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl time.Duration, nbf time.Time) (string, error) {
-	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
+	mc, err := buildClaims(i.issuer, sub, aud, claims, ttl, nbf)
 	if err != nil {
 		return "", err
 	}
@@ -23,12 +23,12 @@ func (i *unsignedIssuer) IssueToken(sub string, aud []string, claims map[string]
 }
 
 type symmIssuer struct {
-	iss string
-	key []byte
+	issuer string
+	key    []byte
 }
 
 func (i *symmIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl time.Duration, nbf time.Time) (string, error) {
-	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
+	mc, err := buildClaims(i.issuer, sub, aud, claims, ttl, nbf)
 	if err != nil {
 		return "", err
 	}
@@ -36,12 +36,12 @@ func (i *symmIssuer) IssueToken(sub string, aud []string, claims map[string]any,
 }
 
 type asymmIssuer struct {
-	iss string
-	key *rsa.PrivateKey
+	issuer string
+	key    *rsa.PrivateKey
 }
 
 func (i *asymmIssuer) IssueToken(sub string, aud []string, claims map[string]any, ttl time.Duration, nbf time.Time) (string, error) {
-	mc, err := buildClaims(i.iss, sub, aud, claims, ttl, nbf)
+	mc, err := buildClaims(i.issuer, sub, aud, claims, ttl, nbf)
 	if err != nil {
 		return "", err
 	}

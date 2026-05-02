@@ -17,7 +17,7 @@ type UnsignedIssuerConfig struct {
 }
 
 func NewUnsignedIssuer(cfg UnsignedIssuerConfig) (Issuer, error) {
-	return &unsignedIssuer{iss: cfg.Issuer}, nil
+	return &unsignedIssuer{issuer: cfg.Issuer}, nil
 }
 
 type SymmIssuerConfig struct {
@@ -29,7 +29,7 @@ func NewSymmIssuer(cfg SymmIssuerConfig) (Issuer, error) {
 	if len(cfg.Key) == 0 {
 		return nil, fmt.Errorf("%w: key must not be empty", ErrConstructInstanceFail)
 	}
-	return &symmIssuer{iss: cfg.Issuer, key: cfg.Key}, nil
+	return &symmIssuer{issuer: cfg.Issuer, key: cfg.Key}, nil
 }
 
 type AsymmIssuerConfig struct {
@@ -41,7 +41,7 @@ func NewAsymmIssuer(cfg AsymmIssuerConfig) (Issuer, error) {
 	if cfg.Key == nil {
 		return nil, fmt.Errorf("%w: private key must not be nil", ErrConstructInstanceFail)
 	}
-	return &asymmIssuer{iss: cfg.Issuer, key: cfg.Key}, nil
+	return &asymmIssuer{issuer: cfg.Issuer, key: cfg.Key}, nil
 }
 
 type Verifier interface {
