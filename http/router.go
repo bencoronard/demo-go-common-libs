@@ -74,6 +74,9 @@ func accessLogMiddleware(logger *slog.Logger, enabled bool) echo.MiddlewareFunc 
 	if !enabled {
 		return nil
 	}
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		HandleError:     true,
 		LogLatency:      true,
