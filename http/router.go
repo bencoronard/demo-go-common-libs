@@ -2,7 +2,6 @@ package http
 
 import (
 	"log/slog"
-	"slices"
 
 	"github.com/bencoronard/demo-go-common-libs/validator"
 	echootel "github.com/labstack/echo-opentelemetry"
@@ -20,13 +19,13 @@ type Config struct {
 
 type echoRouterParams struct {
 	fx.In
-	Cfg        Config
-	ErrHandler GlobalErrorHandler
-	Logger     *slog.Logger                  `optional:"true"`
-	Val        validator.Validator           `optional:"true"`
-	Pp         propagation.TextMapPropagator `optional:"true"`
-	Tp         *trace.TracerProvider         `optional:"true"`
-	Mp         *metric.MeterProvider         `optional:"true"`
+	Config         Config
+	ErrHandler     GlobalErrorHandler
+	Logger         *slog.Logger                  `optional:"true"`
+	Validator      validator.Validator           `optional:"true"`
+	Propagator     propagation.TextMapPropagator `optional:"true"`
+	TracerProvider *trace.TracerProvider         `optional:"true"`
+	MeterProvider  *metric.MeterProvider         `optional:"true"`
 }
 
 func NewEchoRouter(p echoRouterParams) *echo.Echo {
@@ -34,35 +33,32 @@ func NewEchoRouter(p echoRouterParams) *echo.Echo {
 
 	e.HTTPErrorHandler = p.ErrHandler.GetHandler()
 
+	logger := slog.Default()
 	if p.Logger != nil {
-		e.Logger = p.Logger
+		logger = p.Logger
+	}
+	e.Logger = logger
+
+	if p.Validator != nil {
+		e.Validator = p.Validator
 	}
 
-	if p.Val != nil {
-		e.Validator = p.Val
+	middlewares := []echo.MiddlewareFunc{middleware.Recover()}
+
+	if p.Propagator != nil || p.TracerProvider != nil || p.MeterProvider != nil {
+		middlewares = append(middlewares, otelMiddleware(p.Propagator, p.TracerProvider, p.MeterProvider))
 	}
 
-	middlewares := []echo.MiddlewareFunc{
-		middleware.Recover(),
-		otelMiddleware(p.Pp, p.Tp, p.Mp),
-		accessLogMiddleware(p.Logger, p.Cfg.EnableAccessLog),
+	if p.Config.EnableAccessLog {
+		middlewares = append(middlewares, accessLogMiddleware(logger))
 	}
 
-	e.Use(compact(middlewares)...)
+	e.Use(middlewares...)
 
 	return e
 }
 
-func compact(mws []echo.MiddlewareFunc) []echo.MiddlewareFunc {
-	return slices.DeleteFunc(mws, func(mw echo.MiddlewareFunc) bool {
-		return mw == nil
-	})
-}
-
 func otelMiddleware(pp propagation.TextMapPropagator, tp *trace.TracerProvider, mp *metric.MeterProvider) echo.MiddlewareFunc {
-	if tp == nil && mp == nil {
-		return nil
-	}
 	return echootel.NewMiddlewareWithConfig(echootel.Config{
 		Propagators:    pp,
 		TracerProvider: tp,
@@ -70,13 +66,7 @@ func otelMiddleware(pp propagation.TextMapPropagator, tp *trace.TracerProvider, 
 	})
 }
 
-func accessLogMiddleware(logger *slog.Logger, enabled bool) echo.MiddlewareFunc {
-	if !enabled {
-		return nil
-	}
-	if logger == nil {
-		logger = slog.Default()
-	}
+func accessLogMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 	return middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		HandleError:     true,
 		LogLatency:      true,
@@ -98,13 +88,10 @@ func accessLogMiddleware(logger *slog.Logger, enabled bool) echo.MiddlewareFunc 
 				slog.Int64("response_size", v.ResponseSize),
 				slog.String("user_agent", v.UserAgent),
 			}
-
 			if v.Error != nil {
 				attrs = append(attrs, slog.Any("error", v.Error))
 			}
-
 			logger.LogAttrs(c.Request().Context(), slog.LevelInfo, "ACCESS", attrs...)
-
 			return nil
 		},
 	})

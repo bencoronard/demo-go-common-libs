@@ -35,7 +35,7 @@ type globalErrorHandlerParams struct {
 
 func NewGlobalErrorHandler(p globalErrorHandlerParams) GlobalErrorHandler {
 	return &globalErrorHandler{
-		ah: p.AppErrHandler,
-		tp: p.TracerProvider,
+		appErrHandler:  p.AppErrHandler,
+		tracerProvider: p.TracerProvider,
 	}
 }

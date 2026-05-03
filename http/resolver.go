@@ -15,12 +15,14 @@ type authHeaderResolver struct {
 }
 
 func (h *authHeaderResolver) ExtractClaims(r *http.Request) (jwt.MapClaims, error) {
+	prefix := "Bearer "
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
-	if header == "" {
-		return nil, fmt.Errorf("%w: missing Authorization header", ErrMissingRequestHeader)
+
+	if !strings.HasPrefix(header, prefix) {
+		return nil, fmt.Errorf("%w: missing or invalid Authorization header", ErrMissingRequestHeader)
 	}
 
-	claims, err := h.verifier.VerifyToken(header[len("Bearer "):])
+	claims, err := h.verifier.VerifyToken(header[len(prefix):])
 	if err != nil {
 		return nil, err
 	}

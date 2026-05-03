@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -17,8 +16,8 @@ import (
 )
 
 type globalErrorHandler struct {
-	ah AppErrorHandler
-	tp *sdktrace.TracerProvider
+	appErrHandler  AppErrorHandler
+	tracerProvider *sdktrace.TracerProvider
 }
 
 func (h *globalErrorHandler) GetHandler() func(c *echo.Context, err error) {
@@ -40,11 +39,14 @@ func (h *globalErrorHandler) GetHandler() func(c *echo.Context, err error) {
 
 		pd := dto.NewProblemDetail(status).
 			WithDetail(detail).
-			With("timestamp", time.Now()).
-			With("trace", h.extractTraceId(c.Request().Context()))
+			With("timestamp", time.Now())
 
-		if h.ah != nil {
-			pd, handled = h.ah.Handle(err, pd)
+		if h.tracerProvider != nil {
+			pd = pd.With("trace", extractTraceID(c.Request().Context()))
+		}
+
+		if h.appErrHandler != nil {
+			pd, handled = h.appErrHandler.Handle(err, pd)
 		}
 		if !handled {
 			pd = handleUnhandledError(err, pd)
@@ -83,18 +85,14 @@ func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
 			WithStatus(http.StatusUnauthorized).
 			WithDetail(err.Error())
 	default:
-		slog.Error("unhandled error", "error", err)
 		return pd
 	}
 }
 
-func (h *globalErrorHandler) extractTraceId(ctx context.Context) string {
-	if h.tp == nil {
+func extractTraceID(ctx context.Context) string {
+	span := trace.SpanFromContext(ctx).SpanContext()
+	if !span.IsValid() {
 		return ""
 	}
-	span := trace.SpanFromContext(ctx).SpanContext()
-	if span.IsValid() {
-		return span.TraceID().String()
-	}
-	return ""
+	return span.TraceID().String()
 }
