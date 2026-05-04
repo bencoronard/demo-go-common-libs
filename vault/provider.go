@@ -27,7 +27,7 @@ type params struct {
 	Auth      vault.AuthMethod `optional:"true"`
 }
 
-func NewClient(p params) (Client, error) {
+func New(p params) (Client, error) {
 	cfg := vault.DefaultConfig()
 	if cfg.Error != nil {
 		return nil, cfg.Error
