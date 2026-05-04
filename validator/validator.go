@@ -18,6 +18,11 @@ func (v *validator) Validate(i any) error {
 		return nil
 	}
 
+	t := reflect.TypeOf(i)
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+
 	ve, ok := errors.AsType[val.ValidationErrors](err)
 	if !ok {
 		return err
@@ -25,9 +30,16 @@ func (v *validator) Validate(i any) error {
 
 	s := make([]FieldValidationError, 0, len(ve))
 	for _, fe := range ve {
+		field, _ := t.FieldByName(fe.StructField())
+
+		msg := field.Tag.Get("msg")
+		if msg == "" {
+			msg = fe.Tag()
+		}
+
 		s = append(s, FieldValidationError{
 			Field:   strings.ToLower(fe.Field()),
-			Message: fe.Tag(),
+			Message: msg,
 		})
 	}
 
