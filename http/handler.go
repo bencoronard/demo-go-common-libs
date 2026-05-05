@@ -70,7 +70,7 @@ func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
 	}
 
 	switch {
-	case errors.Is(err, auth.ErrInsufficientPermission):
+	case errors.Is(err, auth.ErrUnauthorized):
 		return pd.
 			WithStatus(http.StatusForbidden).
 			WithDetail(err.Error())

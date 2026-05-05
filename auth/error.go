@@ -3,5 +3,5 @@ package auth
 import "errors"
 
 var (
-	ErrInsufficientPermission = errors.New("insufficient permission")
+	ErrUnauthorized = errors.New("unauthorized")
 )
