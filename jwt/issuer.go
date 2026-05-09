@@ -53,7 +53,7 @@ func buildClaims(iss string, sub string, aud []string, claims map[string]any, tt
 
 	rand, err := uuid.NewRandom()
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to generate token UUID: %v", ErrTokenIssuanceFail, err)
+		return nil, fmt.Errorf("failed to generate token's ID: %w", err)
 	}
 
 	mc := jwt.MapClaims{}
@@ -87,7 +87,7 @@ func issueToken(method jwt.SigningMethod, claims jwt.MapClaims, key any) (string
 	token := jwt.NewWithClaims(method, claims)
 	tokenStr, err := token.SignedString(key)
 	if err != nil {
-		return "", fmt.Errorf("%w: failed to sign token: %v", ErrTokenIssuanceFail, err)
+		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
 	return tokenStr, nil
 }

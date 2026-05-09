@@ -11,9 +11,6 @@ type unsignedVerifier struct{}
 
 func (v *unsignedVerifier) VerifyToken(token string) (jwt.MapClaims, error) {
 	return verifyToken(token, func(t *jwt.Token) (any, error) {
-		if t.Method != jwt.SigningMethodNone {
-			return nil, fmt.Errorf("%w: expected none, got %T", ErrTokenVerificationFail, t.Method)
-		}
 		return jwt.UnsafeAllowNoneSignatureType, nil
 	})
 }
@@ -24,9 +21,6 @@ type symmVerifier struct {
 
 func (v *symmVerifier) VerifyToken(token string) (jwt.MapClaims, error) {
 	return verifyToken(token, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("%w: expected HMAC, got %T", ErrTokenVerificationFail, t.Method)
-		}
 		return v.key, nil
 	})
 }
@@ -37,9 +31,6 @@ type asymmVerifier struct {
 
 func (v *asymmVerifier) VerifyToken(token string) (jwt.MapClaims, error) {
 	return verifyToken(token, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("%w: expected RSA, got %T", ErrTokenVerificationFail, t.Method)
-		}
 		return v.key, nil
 	})
 }
@@ -48,7 +39,30 @@ func verifyToken(token string, kf jwt.Keyfunc) (jwt.MapClaims, error) {
 	claims := jwt.MapClaims{}
 
 	if _, err := jwt.ParseWithClaims(token, claims, kf); err != nil {
-		return nil, fmt.Errorf("%w: parsing claims failed: %v", ErrTokenClaimsInvalid, err)
+		return nil, fmt.Errorf("failed to parse token: %w", err)
+	}
+
+	return claims, nil
+}
+
+func verify(token string, kf jwt.Keyfunc) (jwt.MapClaims, error) {
+	claims := jwt.MapClaims{}
+
+	opts := []jwt.ParserOption{
+		jwt.WithValidMethods([]string{
+			jwt.SigningMethodNone.Alg(),
+			jwt.SigningMethodHS256.Alg(),
+			jwt.SigningMethodRS256.Alg(),
+		}),
+		jwt.WithExpirationRequired(),
+		jwt.WithIssuer(""),
+		jwt.WithAllAudiences(""),
+	}
+
+	parser := jwt.NewParser(opts...)
+	_, err := parser.ParseWithClaims(token, claims, kf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
 	return claims, nil

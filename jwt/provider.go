@@ -27,7 +27,7 @@ type SymmIssuerConfig struct {
 
 func NewSymmIssuer(cfg SymmIssuerConfig) (Issuer, error) {
 	if len(cfg.Key) == 0 {
-		return nil, fmt.Errorf("%w: key must not be empty", ErrConstructInstanceFail)
+		return nil, fmt.Errorf("key must not be empty")
 	}
 	return &symmIssuer{issuer: cfg.Issuer, key: cfg.Key}, nil
 }
@@ -39,7 +39,7 @@ type AsymmIssuerConfig struct {
 
 func NewAsymmIssuer(cfg AsymmIssuerConfig) (Issuer, error) {
 	if cfg.Key == nil {
-		return nil, fmt.Errorf("%w: private key must not be nil", ErrConstructInstanceFail)
+		return nil, fmt.Errorf("private key must not be nil")
 	}
 	return &asymmIssuer{issuer: cfg.Issuer, key: cfg.Key}, nil
 }
@@ -58,7 +58,7 @@ type SymmVerifierConfig struct {
 
 func NewSymmVerifier(cfg SymmVerifierConfig) (Verifier, error) {
 	if len(cfg.Key) == 0 {
-		return nil, fmt.Errorf("%w: key must not be empty", ErrConstructInstanceFail)
+		return nil, fmt.Errorf("key must not be empty")
 	}
 
 	keyCopy := make([]byte, len(cfg.Key))
@@ -73,7 +73,7 @@ type AsymmVerifierConfig struct {
 
 func NewAsymmVerifier(cfg AsymmVerifierConfig) (Verifier, error) {
 	if cfg.Key == nil {
-		return nil, fmt.Errorf("%w: public key must not be nil", ErrConstructInstanceFail)
+		return nil, fmt.Errorf("public key must not be nil")
 	}
 	return &asymmVerifier{key: cfg.Key}, nil
 }
