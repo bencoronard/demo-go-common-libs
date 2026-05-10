@@ -21,8 +21,8 @@ func NewUnsignedIssuer(cfg UnsignedIssuerConfig) (Issuer, error) {
 }
 
 type SymmIssuerConfig struct {
-	Issuer string
-	Key    []byte
+	UnsignedIssuerConfig
+	Key []byte
 }
 
 func NewSymmIssuer(cfg SymmIssuerConfig) (Issuer, error) {
@@ -33,8 +33,8 @@ func NewSymmIssuer(cfg SymmIssuerConfig) (Issuer, error) {
 }
 
 type AsymmIssuerConfig struct {
-	Issuer string
-	Key    *rsa.PrivateKey
+	UnsignedIssuerConfig
+	Key *rsa.PrivateKey
 }
 
 func NewAsymmIssuer(cfg AsymmIssuerConfig) (Issuer, error) {
@@ -48,11 +48,34 @@ type Verifier interface {
 	VerifyToken(tokenStr string) (jwt.MapClaims, error)
 }
 
-func NewUnsignedVerifier() (Verifier, error) {
-	return &unsignedVerifier{}, nil
+type UnsignedVerifierConfig struct {
+	TrustedIssuer     string
+	RequiredAudiences []string
+}
+
+func NewUnsignedVerifier(cfg UnsignedVerifierConfig) (Verifier, error) {
+	opts := []jwt.ParserOption{
+		jwt.WithExpirationRequired(),
+		jwt.WithValidMethods([]string{
+			jwt.SigningMethodNone.Alg(),
+		}),
+	}
+
+	if cfg.TrustedIssuer != "" {
+		opts = append(opts, jwt.WithIssuer(cfg.TrustedIssuer))
+	}
+
+	if len(cfg.RequiredAudiences) > 0 {
+		opts = append(opts, jwt.WithAllAudiences(cfg.RequiredAudiences...))
+	}
+
+	return &unsignedVerifier{
+		parser: jwt.NewParser(opts...),
+	}, nil
 }
 
 type SymmVerifierConfig struct {
+	UnsignedVerifierConfig
 	Key []byte
 }
 
@@ -64,10 +87,29 @@ func NewSymmVerifier(cfg SymmVerifierConfig) (Verifier, error) {
 	keyCopy := make([]byte, len(cfg.Key))
 	copy(keyCopy, cfg.Key)
 
-	return &symmVerifier{key: keyCopy}, nil
+	opts := []jwt.ParserOption{
+		jwt.WithExpirationRequired(),
+		jwt.WithValidMethods([]string{
+			jwt.SigningMethodHS256.Alg(),
+		}),
+	}
+
+	if cfg.TrustedIssuer != "" {
+		opts = append(opts, jwt.WithIssuer(cfg.TrustedIssuer))
+	}
+
+	if len(cfg.RequiredAudiences) > 0 {
+		opts = append(opts, jwt.WithAllAudiences(cfg.RequiredAudiences...))
+	}
+
+	return &symmVerifier{
+		parser: jwt.NewParser(opts...),
+		key:    keyCopy,
+	}, nil
 }
 
 type AsymmVerifierConfig struct {
+	UnsignedVerifierConfig
 	Key *rsa.PublicKey
 }
 
@@ -75,5 +117,24 @@ func NewAsymmVerifier(cfg AsymmVerifierConfig) (Verifier, error) {
 	if cfg.Key == nil {
 		return nil, fmt.Errorf("public key must not be nil")
 	}
-	return &asymmVerifier{key: cfg.Key}, nil
+
+	opts := []jwt.ParserOption{
+		jwt.WithExpirationRequired(),
+		jwt.WithValidMethods([]string{
+			jwt.SigningMethodRS256.Alg(),
+		}),
+	}
+
+	if cfg.TrustedIssuer != "" {
+		opts = append(opts, jwt.WithIssuer(cfg.TrustedIssuer))
+	}
+
+	if len(cfg.RequiredAudiences) > 0 {
+		opts = append(opts, jwt.WithAllAudiences(cfg.RequiredAudiences...))
+	}
+
+	return &asymmVerifier{
+		parser: jwt.NewParser(opts...),
+		key:    cfg.Key,
+	}, nil
 }
