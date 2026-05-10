@@ -2,7 +2,7 @@ package jwt
 
 import (
 	"crypto/rsa"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -16,8 +16,8 @@ type UnsignedIssuerConfig struct {
 	Issuer string
 }
 
-func NewUnsignedIssuer(cfg UnsignedIssuerConfig) (Issuer, error) {
-	return &unsignedIssuer{issuer: cfg.Issuer}, nil
+func NewUnsignedIssuer(cfg UnsignedIssuerConfig) Issuer {
+	return &unsignedIssuer{issuer: cfg.Issuer}
 }
 
 type SymmIssuerConfig struct {
@@ -27,7 +27,7 @@ type SymmIssuerConfig struct {
 
 func NewSymmIssuer(cfg SymmIssuerConfig) (Issuer, error) {
 	if len(cfg.Key) == 0 {
-		return nil, fmt.Errorf("key must not be empty")
+		return nil, errors.New("key must not be empty")
 	}
 	return &symmIssuer{issuer: cfg.Issuer, key: cfg.Key}, nil
 }
@@ -39,7 +39,7 @@ type AsymmIssuerConfig struct {
 
 func NewAsymmIssuer(cfg AsymmIssuerConfig) (Issuer, error) {
 	if cfg.Key == nil {
-		return nil, fmt.Errorf("private key must not be nil")
+		return nil, errors.New("private key must not be nil")
 	}
 	return &asymmIssuer{issuer: cfg.Issuer, key: cfg.Key}, nil
 }
@@ -53,12 +53,10 @@ type UnsignedVerifierConfig struct {
 	RequiredAudiences []string
 }
 
-func NewUnsignedVerifier(cfg UnsignedVerifierConfig) (Verifier, error) {
+func NewUnsignedVerifier(cfg UnsignedVerifierConfig) Verifier {
 	opts := []jwt.ParserOption{
 		jwt.WithExpirationRequired(),
-		jwt.WithValidMethods([]string{
-			jwt.SigningMethodNone.Alg(),
-		}),
+		jwt.WithValidMethods([]string{jwt.SigningMethodNone.Alg()}),
 	}
 
 	if cfg.TrustedIssuer != "" {
@@ -69,9 +67,7 @@ func NewUnsignedVerifier(cfg UnsignedVerifierConfig) (Verifier, error) {
 		opts = append(opts, jwt.WithAllAudiences(cfg.RequiredAudiences...))
 	}
 
-	return &unsignedVerifier{
-		parser: jwt.NewParser(opts...),
-	}, nil
+	return &unsignedVerifier{parser: jwt.NewParser(opts...)}
 }
 
 type SymmVerifierConfig struct {
@@ -81,7 +77,7 @@ type SymmVerifierConfig struct {
 
 func NewSymmVerifier(cfg SymmVerifierConfig) (Verifier, error) {
 	if len(cfg.Key) == 0 {
-		return nil, fmt.Errorf("key must not be empty")
+		return nil, errors.New("key must not be empty")
 	}
 
 	keyCopy := make([]byte, len(cfg.Key))
@@ -89,9 +85,7 @@ func NewSymmVerifier(cfg SymmVerifierConfig) (Verifier, error) {
 
 	opts := []jwt.ParserOption{
 		jwt.WithExpirationRequired(),
-		jwt.WithValidMethods([]string{
-			jwt.SigningMethodHS256.Alg(),
-		}),
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 	}
 
 	if cfg.TrustedIssuer != "" {
@@ -115,14 +109,12 @@ type AsymmVerifierConfig struct {
 
 func NewAsymmVerifier(cfg AsymmVerifierConfig) (Verifier, error) {
 	if cfg.Key == nil {
-		return nil, fmt.Errorf("public key must not be nil")
+		return nil, errors.New("public key must not be nil")
 	}
 
 	opts := []jwt.ParserOption{
 		jwt.WithExpirationRequired(),
-		jwt.WithValidMethods([]string{
-			jwt.SigningMethodRS256.Alg(),
-		}),
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
 	}
 
 	if cfg.TrustedIssuer != "" {
