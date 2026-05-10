@@ -2,6 +2,7 @@ package validator
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -25,16 +26,16 @@ func (v *validator) Validate(i any) error {
 
 	ve, ok := errors.AsType[val.ValidationErrors](err)
 	if !ok {
-		return err
+		return fmt.Errorf("failed to validate input: %w", err)
 	}
 
 	s := make([]FieldValidationError, 0, len(ve))
 	for _, fe := range ve {
 		field, _ := t.FieldByName(fe.StructField())
 
-		msg := field.Tag.Get("msg")
+		msg := field.Tag.Get(fmt.Sprintf("%s:msg", fe.Tag()))
 		if msg == "" {
-			msg = fe.Tag()
+			msg = fmt.Sprintf("%v is not valid", fe.Value())
 		}
 
 		s = append(s, FieldValidationError{
