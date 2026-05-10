@@ -2,6 +2,7 @@ package otel
 
 import (
 	"context"
+	"fmt"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
@@ -40,7 +41,7 @@ type params struct {
 func NewTracerProvider(p params) (*trace.TracerProvider, error) {
 	exporter, err := otlptracegrpc.New(context.Background())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create exporter: %w", err)
 	}
 
 	provider := trace.NewTracerProvider(
@@ -52,7 +53,10 @@ func NewTracerProvider(p params) (*trace.TracerProvider, error) {
 
 	p.Lifecycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			return provider.Shutdown(ctx)
+			if err := provider.Shutdown(ctx); err != nil {
+				return fmt.Errorf("failed to shutdown provider: %w", err)
+			}
+			return nil
 		},
 	})
 
@@ -62,7 +66,7 @@ func NewTracerProvider(p params) (*trace.TracerProvider, error) {
 func NewMeterProvider(p params) (*metric.MeterProvider, error) {
 	exporter, err := otlpmetricgrpc.New(context.Background())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create exporter: %w", err)
 	}
 
 	reader := metric.NewPeriodicReader(exporter)
@@ -76,7 +80,10 @@ func NewMeterProvider(p params) (*metric.MeterProvider, error) {
 
 	p.Lifecycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			return provider.Shutdown(ctx)
+			if err := provider.Shutdown(ctx); err != nil {
+				return fmt.Errorf("failed to shutdown provider: %w", err)
+			}
+			return nil
 		},
 	})
 
@@ -86,7 +93,7 @@ func NewMeterProvider(p params) (*metric.MeterProvider, error) {
 func NewLoggerProvider(p params) (*log.LoggerProvider, error) {
 	exporter, err := otlploggrpc.New(context.Background())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create exporter: %w", err)
 	}
 
 	processor := log.NewBatchProcessor(exporter)
@@ -100,7 +107,10 @@ func NewLoggerProvider(p params) (*log.LoggerProvider, error) {
 
 	p.Lifecycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			return provider.Shutdown(ctx)
+			if err := provider.Shutdown(ctx); err != nil {
+				return fmt.Errorf("failed to shutdown provider: %w", err)
+			}
+			return nil
 		},
 	})
 
