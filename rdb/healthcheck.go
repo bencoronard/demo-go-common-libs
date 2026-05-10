@@ -3,6 +3,7 @@ package rdb
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 type healthChecker struct {
@@ -15,5 +16,8 @@ func (h *healthChecker) Name() string {
 }
 
 func (h *healthChecker) Check(ctx context.Context) error {
-	return h.db.PingContext(ctx)
+	if err := h.db.PingContext(ctx); err != nil {
+		return fmt.Errorf("failed to ping database: %w", err)
+	}
+	return nil
 }

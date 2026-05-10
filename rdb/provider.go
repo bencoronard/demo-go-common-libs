@@ -30,12 +30,12 @@ func NewDB(p dbParams) (*gorm.DB, error) {
 		SkipDefaultTransaction: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open connection: %w", err)
 	}
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to obtain instance: %w", err)
 	}
 
 	sqlDB.SetMaxOpenConns(p.Config.MaxOpenConns)
@@ -45,10 +45,16 @@ func NewDB(p dbParams) (*gorm.DB, error) {
 
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			return sqlDB.PingContext(ctx)
+			if err := sqlDB.PingContext(ctx); err != nil {
+				return fmt.Errorf("failed to establish connection: %w", err)
+			}
+			return nil
 		},
 		OnStop: func(_ context.Context) error {
-			return sqlDB.Close()
+			if err := sqlDB.Close(); err != nil {
+				return fmt.Errorf("failed to close connections: %w", err)
+			}
+			return nil
 		},
 	})
 
@@ -63,7 +69,7 @@ type healthCheckerParams struct {
 func NewHealthChecker(p healthCheckerParams) (actuator.HealthChecker, error) {
 	sqlDB, err := p.DB.DB()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to obtain instance: %w", err)
 	}
 
 	name := fmt.Sprintf("rdb_%s", p.DB.Dialector.Name())
