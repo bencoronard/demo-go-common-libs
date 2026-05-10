@@ -2,8 +2,11 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"go.uber.org/fx"
@@ -38,13 +41,15 @@ type httpServerParams struct {
 
 func ServeHTTP(p httpServerParams) error {
 	if err := p.Server.Configure(); err != nil {
-		return err
+		return fmt.Errorf("failed to configure server: %w", err)
 	}
 
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
+			slog.Info("server started", "pid", os.Getpid(), "addr", p.Server.Instance().Addr)
 			go func() {
 				if err := p.Server.Instance().ListenAndServe(); err != http.ErrServerClosed {
+					slog.Error("server startup failed", "error", err)
 					p.Shutdowner.Shutdown()
 				}
 			}()
@@ -71,13 +76,15 @@ type grpcServerParams struct {
 
 func ServeGRPC(p grpcServerParams) error {
 	if err := p.Server.Configure(); err != nil {
-		return err
+		return fmt.Errorf("failed to configure server: %w", err)
 	}
 
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
+			slog.Info("server started", "pid", os.Getpid(), "addr", p.Server.Listener().Addr())
 			go func() {
 				if err := p.Server.Instance().Serve(p.Server.Listener()); err != nil {
+					slog.Error("server startup failed", "error", err)
 					p.Shutdowner.Shutdown()
 				}
 			}()
