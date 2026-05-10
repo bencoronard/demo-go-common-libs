@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -21,10 +22,10 @@ type client struct {
 func (c *client) ReadSecret(ctx context.Context, path string, target any) error {
 	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read secret at path %s: %w", path, err)
 	}
 	if secret == nil || secret.Data == nil {
-		return fmt.Errorf("%w: secret not found at path: %s", ErrSecretNotFound, path)
+		return fmt.Errorf("secret not found at path: %s", path)
 	}
 
 	data := secret.Data
@@ -39,7 +40,7 @@ func (c *client) ReadSecret(ctx context.Context, path string, target any) error 
 		WeaklyTypedInput: true,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode secret: %w", err)
 	}
 
 	return decoder.Decode(data)
@@ -63,6 +64,7 @@ func (c *client) WatchTokenLifecycle(p watcherParams) error {
 					token, err := c.authenticate(authCtx)
 					authCancel()
 					if err != nil {
+						slog.Error("authentication failed", "error", err)
 						select {
 						case <-ctx.Done():
 							return
@@ -74,7 +76,9 @@ func (c *client) WatchTokenLifecycle(p watcherParams) error {
 						}
 					}
 					backoff = p.Config.AuthRetryBackoffInitialInterval
-					c.autoRenewToken(ctx, token)
+					if err := c.autoRenewToken(ctx, token); err != nil {
+						slog.Error("renewal failed", "error", err)
+					}
 				}
 			}()
 			return nil
@@ -105,7 +109,7 @@ func (c *client) autoRenewToken(ctx context.Context, s *vault.Secret) error {
 
 	watcher, err := c.client.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: s})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create a lifetime watcher: %w", err)
 	}
 
 	go watcher.Start()
@@ -132,17 +136,17 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 		secret, err = c.client.Auth().Login(ctx, c.auth)
 	} else {
 		if err := c.resolveLocalToken(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to resolve token: %w", err)
 		}
 		secret, err = c.client.Auth().Token().LookupSelfWithContext(ctx)
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to authenticate: %w", err)
 	}
 
 	if secret == nil {
-		return nil, fmt.Errorf("vault returned an empty response")
+		return nil, fmt.Errorf("received empty response")
 	}
 
 	isTokenLookup := secret.Data != nil && secret.Data["id"] != nil
@@ -167,7 +171,7 @@ func (c *client) resolveLocalToken() error {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read token file at path %s: %w", path, err)
 	}
 
 	tokenStr := strings.TrimSpace(string(data))

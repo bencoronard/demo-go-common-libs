@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/fx"
@@ -30,12 +31,12 @@ type params struct {
 func New(p params) (Client, error) {
 	cfg := vault.DefaultConfig()
 	if cfg.Error != nil {
-		return nil, cfg.Error
+		return nil, fmt.Errorf("fauled to initialize config: %w", cfg.Error)
 	}
 
 	vc, err := vault.NewClient(cfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
 	c := client{client: vc, auth: p.Auth}
@@ -43,7 +44,7 @@ func New(p params) (Client, error) {
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if _, err := c.authenticate(ctx); err != nil {
-				return err
+				return fmt.Errorf("failed to authenticate: %w", err)
 			}
 			return nil
 		},
