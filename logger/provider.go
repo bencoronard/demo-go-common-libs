@@ -9,7 +9,7 @@ import (
 	"go.uber.org/fx"
 )
 
-func NewStdOutLogger() (*slog.Logger, error) {
+func NewStdOutLogger() *slog.Logger {
 	opts := &slog.HandlerOptions{
 		AddSource: true,
 		Level:     slog.LevelInfo,
@@ -21,7 +21,7 @@ func NewStdOutLogger() (*slog.Logger, error) {
 
 	slog.SetDefault(logger)
 
-	return logger, nil
+	return logger
 }
 
 type otelLoggerParams struct {
@@ -29,7 +29,7 @@ type otelLoggerParams struct {
 	Lp *log.LoggerProvider
 }
 
-func NewOtelLogger(p otelLoggerParams) (*slog.Logger, error) {
+func NewOtelLogger(p otelLoggerParams) *slog.Logger {
 	opts := []otelslog.Option{
 		otelslog.WithLoggerProvider(p.Lp),
 		otelslog.WithSource(true),
@@ -41,5 +41,5 @@ func NewOtelLogger(p otelLoggerParams) (*slog.Logger, error) {
 
 	slog.SetDefault(logger)
 
-	return logger, nil
+	return logger
 }
