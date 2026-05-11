@@ -56,7 +56,10 @@ func ServeHTTP(p httpServerParams) error {
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			return p.Server.Instance().Shutdown(ctx)
+			if err := p.Server.Instance().Shutdown(ctx); err != nil {
+				return fmt.Errorf("failed to shudown server: %w", err)
+			}
+			return nil
 		},
 	})
 
