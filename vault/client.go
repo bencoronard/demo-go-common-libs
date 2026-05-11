@@ -77,7 +77,7 @@ func (c *client) WatchTokenLifecycle(p watcherParams) error {
 					}
 					backoff = p.Config.AuthRetryBackoffInitialInterval
 					if err := c.autoRenewToken(ctx, token); err != nil {
-						slog.Error("renewal failed", "error", err)
+						slog.Error("token renewal failed", "error", err)
 					}
 				}
 			}()
@@ -109,7 +109,7 @@ func (c *client) autoRenewToken(ctx context.Context, s *vault.Secret) error {
 
 	watcher, err := c.client.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: s})
 	if err != nil {
-		return fmt.Errorf("failed to create a lifetime watcher: %w", err)
+		return fmt.Errorf("failed to create lifetime watcher: %w", err)
 	}
 
 	go watcher.Start()
@@ -146,7 +146,7 @@ func (c *client) authenticate(ctx context.Context) (*vault.Secret, error) {
 	}
 
 	if secret == nil {
-		return nil, fmt.Errorf("received empty response")
+		return nil, fmt.Errorf("received empty authentication response")
 	}
 
 	isTokenLookup := secret.Data != nil && secret.Data["id"] != nil
@@ -166,7 +166,7 @@ func (c *client) resolveLocalToken() error {
 
 	path := strings.TrimSpace(os.Getenv("VAULT_TOKEN_FILE"))
 	if path == "" {
-		return fmt.Errorf("no vault token found")
+		return fmt.Errorf("no token found")
 	}
 
 	data, err := os.ReadFile(path)
