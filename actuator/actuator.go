@@ -2,6 +2,8 @@ package actuator
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -56,6 +58,7 @@ func (a *actuator) healthCheck(ctx context.Context) {
 			checkCtx, cancel := context.WithTimeout(ctx, a.config.HealthCheckInterval)
 			defer cancel()
 			if err := hc.Check(checkCtx); err != nil {
+				slog.Error(fmt.Sprintf("healthcheck failed for resource: %s", hc.Name()), "error", err)
 				errCh <- err
 			}
 		})

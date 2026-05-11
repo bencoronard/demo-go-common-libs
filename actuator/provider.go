@@ -2,8 +2,11 @@ package actuator
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -70,15 +73,20 @@ func New(p params) (Actuator, error) {
 
 		p.Lifecycle.Append(fx.Hook{
 			OnStart: func(_ context.Context) error {
+				slog.Info("actuator server started", "pid", os.Getpid(), "addr", server.Addr)
 				go func() {
 					if err := server.ListenAndServe(); err != http.ErrServerClosed {
+						slog.Error("actuator server startup failed", "error", err)
 						p.Shutdowner.Shutdown()
 					}
 				}()
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				return server.Shutdown(ctx)
+				if err := server.Shutdown(ctx); err != nil {
+					return fmt.Errorf("failed to shudown actuator server: %w", err)
+				}
+				return nil
 			},
 		})
 	}
