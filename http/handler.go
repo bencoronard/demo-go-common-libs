@@ -8,7 +8,6 @@ import (
 
 	"github.com/bencoronard/demo-go-common-libs/auth"
 	"github.com/bencoronard/demo-go-common-libs/dto"
-	"github.com/bencoronard/demo-go-common-libs/jwt"
 	"github.com/bencoronard/demo-go-common-libs/validator"
 	"github.com/labstack/echo/v5"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -70,17 +69,11 @@ func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
 	}
 
 	switch {
-	case errors.Is(err, auth.ErrUnauthorized):
+	case errors.Is(err, auth.ErrOperationNotPermitted):
 		return pd.
 			WithStatus(http.StatusForbidden).
 			WithDetail(err.Error())
-	case errors.Is(err, ErrMissingRequestHeader):
-		return pd.
-			WithStatus(http.StatusBadRequest).
-			WithDetail(err.Error())
-	case errors.Is(err, jwt.ErrTokenVerificationFail),
-		errors.Is(err, jwt.ErrTokenClaimsInvalid),
-		errors.Is(err, jwt.ErrTokenMalformed):
+	case errors.Is(err, ErrAuthHeaderInvalid):
 		return pd.
 			WithStatus(http.StatusUnauthorized).
 			WithDetail(err.Error())

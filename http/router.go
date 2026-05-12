@@ -17,7 +17,7 @@ type Config struct {
 	EnableAccessLog bool
 }
 
-type echoRouterParams struct {
+type routerParams struct {
 	fx.In
 	Config         Config
 	ErrHandler     GlobalErrorHandler
@@ -28,7 +28,7 @@ type echoRouterParams struct {
 	MeterProvider  *metric.MeterProvider         `optional:"true"`
 }
 
-func NewEchoRouter(p echoRouterParams) *echo.Echo {
+func NewRouter(p routerParams) *echo.Echo {
 	e := echo.New()
 
 	e.HTTPErrorHandler = p.ErrHandler.GetHandler()
@@ -91,7 +91,7 @@ func accessLogMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 			if v.Error != nil {
 				attrs = append(attrs, slog.Any("error", v.Error))
 			}
-			logger.LogAttrs(c.Request().Context(), slog.LevelInfo, "ACCESS", attrs...)
+			logger.LogAttrs(c.Request().Context(), slog.LevelInfo, "", attrs...)
 			return nil
 		},
 	})

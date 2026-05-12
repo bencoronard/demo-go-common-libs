@@ -19,17 +19,17 @@ func (h *authHeaderResolver) ExtractClaims(r *http.Request) (jwt.MapClaims, erro
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
 
 	if !strings.HasPrefix(header, prefix) {
-		return nil, fmt.Errorf("%w: missing or invalid Authorization header", ErrMissingRequestHeader)
+		return nil, ErrAuthHeaderInvalid
 	}
 
 	claims, err := h.verifier.VerifyToken(header[len(prefix):])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to verify token: %w", err)
 	}
 
 	sub, _ := claims["sub"].(string)
 	if sub == "" || !regexp.MustCompile(`^\d+$`).MatchString(sub) {
-		return nil, fmt.Errorf("%w: expected integer, got %q", xjwt.ErrTokenMalformed, sub)
+		return nil, fmt.Errorf("expected integer, got %q", sub)
 	}
 
 	return claims, nil
