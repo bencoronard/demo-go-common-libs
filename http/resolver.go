@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -24,12 +25,19 @@ func (h *authHeaderResolver) ExtractClaims(r *http.Request) (jwt.MapClaims, erro
 
 	claims, err := h.verifier.VerifyToken(header[len(prefix):])
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify token: %w", err)
+		switch {
+		case errors.Is(err, jwt.ErrTokenMalformed),
+			errors.Is(err, jwt.ErrTokenSignatureInvalid),
+			errors.Is(err, jwt.ErrTokenInvalidClaims):
+			return nil, fmt.Errorf("%w: %w", ErrTokenInvalid, err)
+		default:
+			return nil, fmt.Errorf("failed to verify token: %w", err)
+		}
 	}
 
 	sub, _ := claims["sub"].(string)
 	if sub == "" || !regexp.MustCompile(`^\d+$`).MatchString(sub) {
-		return nil, fmt.Errorf("expected integer, got %q", sub)
+		return nil, fmt.Errorf("%w: `sub` expects integer, got %q", ErrTokenInvalid, sub)
 	}
 
 	return claims, nil

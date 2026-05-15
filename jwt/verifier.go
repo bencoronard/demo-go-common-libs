@@ -2,8 +2,6 @@ package jwt
 
 import (
 	"crypto/rsa"
-	"errors"
-	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -44,14 +42,7 @@ func verifyToken(p *jwt.Parser, token string, kf jwt.Keyfunc) (jwt.MapClaims, er
 	claims := jwt.MapClaims{}
 
 	if _, err := p.ParseWithClaims(token, claims, kf); err != nil {
-		switch {
-		case errors.Is(err, jwt.ErrTokenMalformed):
-		case errors.Is(err, jwt.ErrTokenSignatureInvalid):
-		case errors.Is(err, jwt.ErrTokenInvalidClaims):
-			return nil, err
-		default:
-			return nil, fmt.Errorf("failed to parse token: %w", err)
-		}
+		return nil, err
 	}
 
 	return claims, nil
