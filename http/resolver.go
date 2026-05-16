@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	xjwt "github.com/bencoronard/demo-go-common-libs/jwt"
@@ -33,11 +32,6 @@ func (h *authHeaderResolver) ExtractClaims(r *http.Request) (jwt.MapClaims, erro
 		default:
 			return nil, fmt.Errorf("failed to verify token: %w", err)
 		}
-	}
-
-	sub, _ := claims["sub"].(string)
-	if sub == "" || !regexp.MustCompile(`^\d+$`).MatchString(sub) {
-		return nil, fmt.Errorf("%w: `sub` expects integer, got %q", ErrTokenInvalid, sub)
 	}
 
 	return claims, nil
