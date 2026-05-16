@@ -74,7 +74,7 @@ func handleUnhandledError(err error, pd dto.ProblemDetail) dto.ProblemDetail {
 			WithStatus(http.StatusForbidden).
 			WithDetail(err.Error())
 	case errors.Is(err, ErrAuthHeaderInvalid),
-		errors.Is(err, ErrTokenInvalid):
+		errors.Is(err, ErrAuthTokenInvalid):
 		return pd.
 			WithStatus(http.StatusUnauthorized).
 			WithDetail(err.Error())

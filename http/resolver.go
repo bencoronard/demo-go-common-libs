@@ -28,7 +28,7 @@ func (h *authHeaderResolver) ExtractClaims(r *http.Request) (jwt.MapClaims, erro
 		case errors.Is(err, jwt.ErrTokenMalformed),
 			errors.Is(err, jwt.ErrTokenSignatureInvalid),
 			errors.Is(err, jwt.ErrTokenInvalidClaims):
-			return nil, fmt.Errorf("%w: %w", ErrTokenInvalid, err)
+			return nil, fmt.Errorf("%w: %w", ErrAuthTokenInvalid, err)
 		default:
 			return nil, fmt.Errorf("failed to verify token: %w", err)
 		}
