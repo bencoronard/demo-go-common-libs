@@ -2,12 +2,6 @@ package actuator
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"net"
-	"net/http"
-	"os"
-	"strconv"
 	"time"
 
 	"go.uber.org/fx"
@@ -16,6 +10,7 @@ import (
 type Actuator interface {
 	Liveness() bool
 	Readiness() bool
+	ExposeHTTPEndpoints(p serverParams) error
 }
 
 type HealthChecker interface {
@@ -23,19 +18,21 @@ type HealthChecker interface {
 	Check(ctx context.Context) error
 }
 
-type Config struct {
-	Host                string
-	Port                int
+type HealthCheckConfig struct {
 	HealthCheckInterval time.Duration
 	HealthCheckTimeout  time.Duration
+}
+
+type ServerConfig struct {
+	Host string
+	Port int
 }
 
 type params struct {
 	fx.In
 	Lifecycle      fx.Lifecycle
-	Shutdowner     fx.Shutdowner
 	HealthCheckers []HealthChecker `group:"healthcheck"`
-	Config         Config
+	Config         HealthCheckConfig
 }
 
 func New(p params) (Actuator, error) {
@@ -55,41 +52,6 @@ func New(p params) (Actuator, error) {
 			return nil
 		},
 	})
-
-	if p.Config.Host != "" && p.Config.Port != 0 {
-		mux := http.NewServeMux()
-		mux.HandleFunc("GET /actuator/liveness", a.liveness)
-		mux.HandleFunc("GET /actuator/readiness", a.readiness)
-
-		server := &http.Server{
-			Addr:              net.JoinHostPort(p.Config.Host, strconv.Itoa(p.Config.Port)),
-			Handler:           mux,
-			ReadTimeout:       2 * time.Second,
-			ReadHeaderTimeout: 1 * time.Second,
-			WriteTimeout:      2 * time.Second,
-			IdleTimeout:       10 * time.Second,
-			MaxHeaderBytes:    4 << 10,
-		}
-
-		p.Lifecycle.Append(fx.Hook{
-			OnStart: func(_ context.Context) error {
-				slog.Info("actuator server started", "pid", os.Getpid(), "addr", server.Addr)
-				go func() {
-					if err := server.ListenAndServe(); err != http.ErrServerClosed {
-						slog.Error("actuator server startup failed", "error", err)
-						p.Shutdowner.Shutdown()
-					}
-				}()
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				if err := server.Shutdown(ctx); err != nil {
-					return fmt.Errorf("failed to shudown actuator server: %w", err)
-				}
-				return nil
-			},
-		})
-	}
 
 	return a, nil
 }

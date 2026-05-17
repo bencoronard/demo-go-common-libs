@@ -4,16 +4,21 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/fx"
 )
 
 type actuator struct {
 	ready          atomic.Bool
 	healthCheckers []HealthChecker
-	config         Config
+	config         HealthCheckConfig
 }
 
 func (a *actuator) Liveness() bool {
@@ -22,6 +27,50 @@ func (a *actuator) Liveness() bool {
 
 func (a *actuator) Readiness() bool {
 	return a.ready.Load()
+}
+
+type serverParams struct {
+	fx.In
+	Lifecycle  fx.Lifecycle
+	Shutdowner fx.Shutdowner
+	Config     ServerConfig
+}
+
+func (a *actuator) ExposeHTTPEndpoints(p serverParams) error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /actuator/liveness", a.liveness)
+	mux.HandleFunc("GET /actuator/readiness", a.readiness)
+
+	server := &http.Server{
+		Addr:              net.JoinHostPort(p.Config.Host, strconv.Itoa(p.Config.Port)),
+		Handler:           mux,
+		ReadTimeout:       2 * time.Second,
+		ReadHeaderTimeout: 1 * time.Second,
+		WriteTimeout:      2 * time.Second,
+		IdleTimeout:       10 * time.Second,
+		MaxHeaderBytes:    4 << 10,
+	}
+
+	p.Lifecycle.Append(fx.Hook{
+		OnStart: func(_ context.Context) error {
+			slog.Info("actuator server started", "pid", os.Getpid(), "addr", server.Addr)
+			go func() {
+				if err := server.ListenAndServe(); err != http.ErrServerClosed {
+					slog.Error("actuator server startup failed", "error", err)
+					p.Shutdowner.Shutdown()
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			if err := server.Shutdown(ctx); err != nil {
+				return fmt.Errorf("failed to shudown actuator server: %w", err)
+			}
+			return nil
+		},
+	})
+
+	return nil
 }
 
 func (a *actuator) monitor(ctx context.Context) {
